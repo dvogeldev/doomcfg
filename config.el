@@ -1,51 +1,51 @@
+;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
+
 ;; Maximum GC threshold during startup - prevent collections entirely
 (setq gc-cons-threshold most-positive-fixnum
       gc-cons-percentage 1.0)
 
-;; Restore GC after startup with idle-timer for smoother operation
+;; Restore GC after startup with an idle-timer for smoother operation
 (add-hook 'emacs-startup-hook
           (lambda ()
+            ;; Reasonable GC settings for normal use
             (setq gc-cons-threshold (* 256 1024 1024)  ; 256MB
                   gc-cons-percentage 0.1)
-            ;; GC when truly idle (5 seconds of no input)
-            (run-with-idle-timer 5 t
-              (lambda ()
-                (when (not (active-minibuffer-window))
-                  (garbage-collect))))))
+            ;; GC when idle (5 seconds of no input, and no minibuffer)
+            (run-with-idle-timer
+             5 t
+             (lambda ()
+               (unless (active-minibuffer-window)
+                 (garbage-collect))))))
 
-;; Reduce startup noise
+;; Reduce startup noise / layout jitter
 (setq inhibit-compacting-font-caches t
       inhibit-startup-screen t
       initial-scratch-message nil
-      frame-inhibit-implied-resize t)  ; Critical for X11
+      frame-inhibit-implied-resize t)  ; also good on Wayland/XWayland
 
-;; Make EVERY package defer by default
-(setq use-package-always-defer t
-      use-package-expand-minimally t)  ; Faster macro expansion
+;; Keep use-package behavior close to Doom defaults
+;; (optional micro-optimization)
+(setq use-package-expand-minimally t)
 
-(setq doom-incremental-idle-timer 10.0)  ; Increase from default 1.0
-(setq doom-incremental-first-idle-timer 5.0)  ; Increase from default 0.5
+;; Doom's incremental loading – slightly relaxed so it interferes less
+(setq doom-incremental-idle-timer 10.0
+      doom-incremental-first-idle-timer 5.0)
 
-;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
-
-;; Place your private configuration here! Remember, you do not need to run 'doom
-;; sync' after modifying this file!
-
-;; Some functionality uses this to identify you, e.g. GPG configuration, email
-;; clients, file templates and snippets.
+;; Some functionality uses this to identify you, e.g. GPG configuration,
+;; email clients, file templates and snippets.
 (setq user-full-name "David Vogel"
       user-mail-address "dvogelca@proton.me")
 
 (setq auth-sources '("~/.authinfo.gpg" "~/.authinfo")
       auth-source-cache-expiry nil) ; default is 7200 (2h)
 
-;; Set SSH_AUTH_SOCK from keychain
+;; Set SSH_AUTH_SOCK from gpg-agent keychain (systemd user unit)
 (setenv "SSH_AUTH_SOCK"
         (concat (or (getenv "XDG_RUNTIME_DIR")
                     (format "/run/user/%d" (user-uid)))
                 "/gnupg/S.gpg-agent.ssh"))
 
-(setq doom-font (font-spec :family "Hasklug Nerd Font Mono" :size 20)
+(setq doom-font (font-spec :family "Hasklug Nerd Font Mono" :size 16)
       doom-variable-pitch-font (font-spec :family "Alegreya" :size 18)
       doom-big-font (font-spec :family "Hasklug Nerd Font Mono" :size 22))
 
@@ -56,102 +56,93 @@
   (unless (display-graphic-p)
     (set-face-background 'default "undefined")))
 
-;; remove top frame bar in emacs
+;; Remove top frame bar in Emacs
 (add-to-list 'default-frame-alist '(undecorated . t))
 
-(setq doom-modeline-icon t)
-(setq doom-modeline-major-mode-icon t)
-(setq doom-modeline-lsp-icon t)
-(setq doom-modeline-major-mode-color-icon t)
+;; Modeline appearance
+(setq doom-modeline-icon t
+      doom-modeline-major-mode-icon t
+      doom-modeline-lsp-icon t
+      doom-modeline-major-mode-color-icon t)
 
 (set-frame-parameter (selected-frame) 'alpha '(96 . 97))
-(add-to-list 'default-frame-alist '(alpha . (96 .97)))
+(add-to-list 'default-frame-alist '(alpha . (96 . 97)))
 
-;; Aggresssive Indent
+;; Aggressive indent can be nice but sometimes intrusive.
+;; Uncomment if you want it globally in prog-mode.
 ;; (use-package! aggressive-indent
-;;   :defer t
 ;;   :hook (prog-mode . aggressive-indent-mode))
 
-;; Blink cursor
 (blink-cursor-mode 1)
 
-;; This determines the style of line numbers in effect. If set to `nil', line
-;; numbers are disabled. For relative line numbers, set this to `relative'.
+;; Line numbers: nil, t, or 'relative
 (setq display-line-numbers-type 'relative)
 
-;; Line wrapping
+;; Soft wrapping by default
 (global-visual-line-mode t)
 
 ;; Send files to trash instead of fully deleting
 (setq delete-by-moving-to-trash t)
-;; Save automatically
+
+;; Enable simple auto-save
 (setq auto-save-default t)
 
-;; Performance optimizations
-(setq gc-cons-threshold (* 256 1024 1024))
-(setq read-process-output-max (* 4 1024 1024))
-(setq comp-deferred-compilation t)
-(setq comp-async-jobs-number 8)
+;; Increase amount of data Emacs reads from processes (LSP, etc.)
+(setq read-process-output-max (* 4 1024 1024)) ; 4MB
 
-;; Garbage collector optimization
-(setq gcmh-idle-delay 5)
-(setq gcmh-high-cons-threshold (* 1024 1024 1024))
+;; Native compilation tweaks
+(setq comp-deferred-compilation t
+      comp-async-jobs-number 4) ; a bit gentler than 8 on Ryzen 3
 
-;; Version control optimization
+;; VC: only handle Git for speed (especially with TRAMP)
 (setq vc-handled-backends '(Git))
 
-;; Fix x11 issues
-(setq x-no-window-manager t)
-(setq frame-inhibit-implied-resize t)
+;; Pointer focus behavior
 (setq focus-follows-mouse nil)
 
-;; set specific browser to open links
-;;(setq browse-url-browser-function 'browse-url-firefox)
-;; set browser to firefox
-(setq browse-url-browser-function 'browse-url-generic)
-(setq browse-url-generic-program "zen-browser")  ; replace with actual executable name
+;; Use a specific external browser
+(setq browse-url-browser-function 'browse-url-generic
+      browse-url-generic-program "zen-browser")  ; adjust if needed
 
-;; Speed of which-key popup
 (setq which-key-idle-delay 0.2)
 
-;; Completion mechanisms (commented out as they interfere with vertico)
-;; (setq completing-read-function #'completing-read-default)
-;; (setq read-file-name-function #'read-file-name-default)
-;; Makes path completion more like find-file everywhere
+;; Make completion case-insensitive where it makes sense
 (setq read-file-name-completion-ignore-case t
       read-buffer-completion-ignore-case t
       completion-ignore-case t)
-;; Use the familiar C-x C-f interface for directory completion
+
+;; Use the familiar C-x C-f interface for directory completion in minibuffer
 (map! :map minibuffer-mode-map
       :when (modulep! :completion vertico)
       "C-x C-f" #'find-file)
 
-;; Save minibuffer history - enables command history in M-x
 (use-package! savehist
   :config
   (setq savehist-file (concat doom-cache-dir "savehist")
         savehist-save-minibuffer-history t
         history-length 1000
         history-delete-duplicates t
-        savehist-additional-variables '(search-ring
-                                        regexp-search-ring
-                                        extended-command-history))
+        savehist-additional-variables
+        '(search-ring
+          regexp-search-ring
+          extended-command-history))
   (savehist-mode 1))
 
 (after! vertico
-  ;; Add file preview
+  ;; Tidy file paths in minibuffer
   (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
-  (define-key vertico-map (kbd "DEL") #'vertico-directory-delete-char)
+
+  (define-key vertico-map (kbd "DEL")   #'vertico-directory-delete-char)
   (define-key vertico-map (kbd "M-DEL") #'vertico-directory-delete-word)
-  ;; Make vertico use a more minimal display
+
+  ;; Display / navigation tweaks
   (setq vertico-count 17
         vertico-cycle t
-        vertico-resize t)
-  ;; Enable alternative filter methods
-  (setq vertico-sort-function #'vertico-sort-history-alpha)
-  ;; Quick actions keybindings
-  (define-key vertico-map (kbd "C-j") #'vertico-next)
-  (define-key vertico-map (kbd "C-k") #'vertico-previous)
+        vertico-resize t
+        vertico-sort-function #'vertico-sort-history-alpha)
+
+  (define-key vertico-map (kbd "C-j")   #'vertico-next)
+  (define-key vertico-map (kbd "C-k")   #'vertico-previous)
   (define-key vertico-map (kbd "M-RET") #'vertico-exit-input)
 
   ;; History navigation
@@ -159,56 +150,46 @@
   (define-key vertico-map (kbd "M-n") #'vertico-next-history)
   (define-key vertico-map (kbd "C-r") #'consult-history)
 
-  ;; Configure orderless for better filtering
+  ;; Orderless: flexible, fuzzy-ish matching
   (setq completion-styles '(orderless basic)
         completion-category-defaults nil
-        completion-category-overrides '((file (styles basic partial-completion orderless))))
+        completion-category-overrides
+        '((file (styles basic partial-completion orderless))))
 
-  ;; Customize orderless behavior
   (setq orderless-component-separator #'orderless-escapable-split-on-space
-        orderless-matching-styles '(orderless-literal
-                                    orderless-prefixes
-                                    orderless-initialism
-                                    orderless-flex
-                                    orderless-regexp)))
+        orderless-matching-styles
+        '(orderless-literal
+          orderless-prefixes
+          orderless-initialism
+          orderless-flex
+          orderless-regexp)))
 
-;; Quick command repetition
 (use-package! vertico-repeat
   :after vertico
   :config
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
   (map! :leader
         (:prefix "r"
-         :desc "Repeat completion" "v" #'vertico-repeat)))
+         :desc "Repeat last Vertico session" "v" #'vertico-repeat)))
 
-;; TODO Not currently working
-;; Enhanced sorting and filtering with prescient
-;; (use-package! vertico-prescient
-;;   :after vertico
-;;   :config
-;;   (vertico-prescient-mode 1)
-;;   (prescient-persist-mode 1)
-;;   (setq prescient-sort-length-enable nil
-;;         prescient-filter-method '(literal regexp initialism fuzzy)))
-
-;; Enhanced marginalia annotations
 (after! marginalia
-  (setq marginalia-annotators '(marginalia-annotators-heavy marginalia-annotators-light nil))
-  ;; Show more details in marginalia
-  (setq marginalia-max-relative-age 0
+  (setq marginalia-annotators
+        '(marginalia-annotators-heavy
+          marginalia-annotators-light
+          nil)
+        marginalia-max-relative-age 0
         marginalia-align 'right))
 
-;; Corrected Embark configuration
 (map! :leader
-      (:prefix ("k" . "embark")  ;; Using 'k' prefix instead of 'e' which conflicts with elfeed
-       :desc "Embark act" "a" #'embark-act
-       :desc "Embark dwim" "d" #'embark-dwim
+      (:prefix ("k" . "embark")  ;; 'k' to avoid conflicts with other apps
+       :desc "Embark act"     "a" #'embark-act
+       :desc "Embark dwim"    "d" #'embark-dwim
        :desc "Embark collect" "c" #'embark-collect))
 
-;; Configure consult for better previews
 (after! consult
   (setq consult-preview-key "M-."
-        consult-ripgrep-args "rg --null --line-buffered --color=never --max-columns=1000 --path-separator /   --smart-case --no-heading --with-filename --line-number --search-zip"
+        consult-ripgrep-args
+        "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --with-filename --line-number --search-zip"
         consult-narrow-key "<"
         consult-line-numbers-widen t
         consult-async-min-input 2
@@ -216,25 +197,30 @@
         consult-async-input-throttle 0.2
         consult-async-input-debounce 0.1)
 
-  ;; More useful previews for different commands
+  ;; More useful previews for various commands
   (consult-customize
-   consult-theme consult-ripgrep consult-git-grep consult-grep
-   consult-bookmark consult-recent-file consult-xref
+   consult-theme
+   consult-ripgrep
+   consult-git-grep
+   consult-grep
+   consult-bookmark
+   consult-recent-file
+   consult-xref
    :preview-key '(:debounce 0.4 any)))
 
-;; Enhanced directory navigation
 (use-package! consult-dir
-  :bind
-  (("C-x C-d" . consult-dir)
-   :map vertico-map
-   ("C-x C-d" . consult-dir)
-   ("C-x C-j" . consult-dir-jump-file)))
+  :bind (("C-x C-d" . consult-dir)
+         :map vertico-map
+         ("C-x C-d" . consult-dir)
+         ("C-x C-j" . consult-dir-jump-file)))
 
-;; Add additional useful shortcuts
 (map! :leader
       (:prefix "s"
-       :desc "Command history" "h" #'consult-history
-       :desc "Recent directories" "d" #'consult-dir))
+       :desc "Consult command history" "h" #'consult-history
+       :desc "Consult recent directories" "d" #'consult-dir))
+
+;; NOTE: If you decide to go all-in on Corfu, you can safely remove this
+;; entire block *and* the `company` module from :completion in init.el.
 
 (after! company
   (setq company-minimum-prefix-length 2
@@ -244,36 +230,38 @@
         company-tooltip-align-annotations t)
 
   ;; Make company-files a higher priority backend
-  (setq company-backends (cons 'company-files (delete 'company-files company-backends)))
+  (setq company-backends (cons 'company-files
+                               (delete 'company-files company-backends)))
 
   ;; Better file path completion settings
-  (setq company-files-exclusions nil)
-  (setq company-files-chop-trailing-slash t)
+  (setq company-files-exclusions nil
+        company-files-chop-trailing-slash t)
 
   ;; Enable completion at point for file paths
   (defun my/enable-path-completion ()
-    "Enable file path completion using company."
+    "Enable file path completion using company-files."
     (setq-local company-backends
                 (cons 'company-files company-backends)))
 
   ;; Enable for all major modes
   (add-hook 'after-change-major-mode-hook #'my/enable-path-completion)
 
-  ;; Custom file path trigger
+  ;; Heuristic: detect path-like input for a custom backend
   (defun my/looks-like-path-p (input)
     "Check if INPUT looks like a file path."
-    (or (string-match-p "^/" input)         ;; Absolute path
-        (string-match-p "^~/" input)        ;; Home directory
-        (string-match-p "^\\.\\{1,2\\}/" input))) ;; Relative path
+    (or (string-match-p "^/" input)       ;; Absolute path
+        (string-match-p "^~/" input)      ;; Home directory
+        (string-match-p "^\\.\\{1,2\\}/" input))) ;; ./ or ../ relative path
 
   (defun my/company-path-trigger (command &optional arg &rest ignored)
     "Company backend that triggers file completion for path-like input."
     (interactive (list 'interactive))
     (cl-case command
       (interactive (company-begin-backend 'company-files))
-      (prefix (when (my/looks-like-path-p (or (company-grab-line "\\([^ ]*\\)" 1) ""))
+      (prefix (when (my/looks-like-path-p
+                     (or (company-grab-line "\\([^ ]*\\)" 1) ""))
                 (company-files 'prefix)))
-      (t (apply 'company-files command arg ignored))))
+      (t (apply #'company-files command arg ignored))))
 
   ;; Add the custom path trigger to backends
   (add-to-list 'company-backends 'my/company-path-trigger))
