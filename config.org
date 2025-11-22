@@ -349,3 +349,80 @@ Using Zen Browser via generic browse-url.
   ;; Add the custom path trigger to backends
   (add-to-list 'company-backends 'my/company-path-trigger))
 #+end_src
+* Org Mode
+#+begin_src elisp
+(setq org-directory "~/org/"
+      org-agenda-files '("~/org/todo.org" "~/org/agenda.org")  ; add more later if needed
+      org-default-notes-file "~/org/inbox.org"
+
+      ;; Org-roam basic setup
+      org-roam-directory "~/org/notes"
+      org-roam-capture-templates
+      '(("d" "default" plain
+         "%?"
+         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
+         :unnarrowed t)))
+
+;; Keybindings — muscle memory heaven
+(map! :leader
+      :prefix ("v" . "workflow")
+      :desc "Agenda"              "a" #'org-agenda
+      :desc "Capture note/todo"   "c" #'org-capture
+      :desc "Roam find"           "f" #'org-roam-node-find
+      :desc "Roam capture"        "i" #'org-roam-capture
+      :desc "Refile"              "r" #'org-refile
+      :desc "Inbox - review"      "I" (lambda () (interactive) (find-file "~/org/inbox.org"))
+      :desc "Daily review"        "d" #'my/daily-review)
+
+#+end_src
+** Capture Templates
+#+begin_src elisp
+(setq org-capture-templates
+      '(("t" "Todo" entry
+         (file "~/org/inbox.org")
+         "* TODO %?\n  %i\n  %a" :empty-lines 1)
+
+        ("n" "Note" entry
+         (file "~/org/inbox.org")
+         "* %? :note:\n  %i\n  %U" :empty-lines 1)
+
+        ("m" "Meeting" entry
+         (file "~/org/inbox.org")
+         "* MEETING %? :meeting:\n  %U" :empty-lines 1)
+
+        ("r" "Roam note" plain
+         #'org-roam-capture--capture   ; the function
+         "%?"
+         :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n")
+         :immediate-finish t
+         :unnarrowed t)))
+#+end_src
+
+** Refiling setup
+#+begin_src elisp
+(setq org-refile-targets '(("~/org/todo.org" :maxlevel . 2)
+                           ("~/org/agenda.org" :maxlevel . 2)
+                           (org-agenda-files :maxlevel . 2)
+                           ("~/org/notes" :maxlevel . 2)))  ; allows refiling to roam nodes too
+
+(setq org-refile-use-outline-path 'file   ; shows filenames in refile menu
+      org-outline-path-complete-in-steps nil)
+
+#+end_src
+** Todo keywords
+#+begin_src elisp(setq org-todo-keywords
+      '((sequence "TODO(t)" "NEXT(n)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
+#+end_src
+** One Key daily agenda + inbox review
+#+begin_src elisp
+(defun my/daily-review ()
+  (interactive)
+  (org-agenda nil "n")      ; custom agenda view showing inbox + today
+  (delete-other-windows)
+  (split-window-right)
+  (find-file "~/org/inbox.org"))
+
+(map! :leader :desc "Daily review" "o d" #'my/daily-review)
+
+#+end_src
