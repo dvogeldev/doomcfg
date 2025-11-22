@@ -415,7 +415,7 @@ Using Zen Browser via generic browse-url.
 (setq org-todo-keywords
       '((sequence "TODO(t)" "NEXT(n)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 #+end_src
-** One Key daily agenda + inbox review
+** One-Key daily agenda + inbox review
 #+begin_src elisp
 (defun my/daily-review ()
   (interactive)
