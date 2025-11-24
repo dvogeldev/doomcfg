@@ -1,5 +1,42 @@
 #+title: Literate Doom Emacs Configuration
 #+PROPERTY: header-args:elisp :tangle config.el
+#+STARTUP: folded
+
+* Table of Contents :toc:
+- [[#boilerplate][Boilerplate]]
+- [[#initial-setup][Initial Setup]]
+  - [[#startup-optimizations][Startup Optimizations]]
+  - [[#identity--auth][Identity & Auth]]
+  - [[#keychain--ssh-agent][Keychain / SSH Agent]]
+  - [[#fonts][Fonts]]
+  - [[#theme--ui][Theme & UI]]
+  - [[#frame-transparency][Frame Transparency]]
+  - [[#indenting][Indenting]]
+  - [[#cursor-blink][Cursor Blink]]
+  - [[#line-wrapping--line-numbers][Line Wrapping & Line Numbers]]
+  - [[#trash--auto-saving][Trash & Auto Saving]]
+  - [[#general-performance--system-tweaks][General Performance / System Tweaks]]
+  - [[#browser-integration][Browser Integration]]
+  - [[#which-key-speed][Which-Key Speed]]
+- [[#completion-stack-vertico--orderless--consult--embark][Completion Stack (Vertico / Orderless / Consult / Embark)]]
+  - [[#minibuffer-completion-defaults][Minibuffer Completion Defaults]]
+  - [[#savehist-minibuffer-history][Savehist (minibuffer history)]]
+  - [[#vertico][Vertico]]
+  - [[#orderless][Orderless]]
+  - [[#vertico-repeat][Vertico Repeat]]
+  - [[#marginalia][Marginalia]]
+  - [[#embark-keybindings][Embark Keybindings]]
+  - [[#consult-search--jump-like-telescope][Consult (Search / Jump, like Telescope)]]
+  - [[#consult-dir][Consult-Dir]]
+- [[#company-configuration][Company Configuration]]
+- [[#org-mode][Org Mode]]
+  - [[#capture-templates][Capture Templates]]
+  - [[#refiling-setup][Refiling setup]]
+  - [[#keywords][keywords]]
+  - [[#one-key-daily-agenda--inbox-review][One-Key daily agenda + inbox review]]
+- [[#web-bookmarks-capture-system][Web Bookmarks Capture System]]
+  - [[#browser-integration-1][Browser Integration]]
+  - [[#enhanced-capture-templates][Enhanced Capture Templates]]
 
 * Boilerplate
 #+begin_src elisp
@@ -90,6 +127,12 @@ I really like GeistMono as a replacement for SourceCode Pro. Alegreya is a great
       doom-modeline-major-mode-icon t
       doom-modeline-lsp-icon t
       doom-modeline-major-mode-color-icon t)
+
+;; Golden Ratio
+(use-package! golden-ratio
+  :config
+  (setq golden-ratio-auto-scale t)
+  (golden-ratio-mode 1))
 #+end_src
 
 ** Frame Transparency
@@ -191,7 +234,7 @@ Using Zen Browser via generic browse-url.
   (savehist-mode 1))
 #+end_src
 
-** Vertico + Orderless
+** Vertico
 #+begin_src elisp
 (after! vertico
   ;; Tidy file paths in minibuffer
@@ -215,6 +258,9 @@ Using Zen Browser via generic browse-url.
   (define-key vertico-map (kbd "M-n") #'vertico-next-history)
   (define-key vertico-map (kbd "C-r") #'consult-history)
 
+#+end_src
+** Orderless
+#+begin_src elisp
   ;; Orderless: flexible, fuzzy-ish matching
   (setq completion-styles '(orderless basic)
         completion-category-defaults nil
