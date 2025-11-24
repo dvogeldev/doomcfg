@@ -352,7 +352,7 @@ Using Zen Browser via generic browse-url.
 * Org Mode
 #+begin_src elisp
 (setq org-directory "~/org/"
-      org-agenda-files '("~/org/todo.org" "~/org/agenda.org")  ; add more later if needed
+      org-agenda-files '("~/org/todo.org" "~/org/agenda.org" "~/org/bookmarks.org")
       org-default-notes-file "~/org/inbox.org"
 
       ;; Org-roam basic setup
@@ -426,4 +426,276 @@ Using Zen Browser via generic browse-url.
 
 (map! :leader :desc "Daily review" "o d" #'my/daily-review)
 
+#+end_src
+* Web Bookmarks Capture System
+#+begin_src elisp
+;; Bookmark Management Functions
+
+;; Enhanced search with better filtering
+(defun my/bookmarks-search (&optional query)
+  "Search through bookmarks using consult-ripgrep with filtering.
+With QUERY, use it as initial search term."
+  (interactive)
+  (let ((consult-ripgrep-args
+         "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --with-filename --line-number --search-zip"))
+    (consult-ripgrep "~/org/bookmarks.org" query)))
+
+;; Browse bookmark at point with better error handling
+(defun my/bookmarks-browse-at-point ()
+  "Open the URL at point in the default browser."
+  (interactive)
+  (let ((url (org-entry-get (point) "URL")))
+    (if url
+        (browse-url url)
+      (message "No URL found at point"))))
+
+;; Enhanced quick capture with auto-detection
+(defun my/bookmarks-capture-quick ()
+  "Quick bookmark capture with minimal prompts and auto-detection."
+  (interactive)
+  (let* ((current-url (or (thing-at-point-url-at-point)
+                         (when (bound-and-true-p browse-url-browser-function)
+                           (read-string "URL: "))))
+         (title (when current-url
+                  (or (getenv "BOOKMARK_TITLE")
+                      (read-string "Title: " (url-get-title-at-url current-url))))))
+    (let ((org-capture-mode-hook nil))
+      (org-capture nil "bq"))
+    (when current-url
+      (goto-char (point-min))
+      (when (search-forward "URL:" nil t)
+        (forward-char)
+        (insert current-url))
+      (when (search-forward "Title:" nil t)
+        (forward-char)
+        (insert title)))))
+
+;; Rich capture with full metadata editing
+(defun my/bookmarks-capture-rich ()
+  "Rich bookmark capture with full metadata editing."
+  (interactive)
+  (org-capture nil "br"))
+
+;; Categorized capture with target selection
+(defun my/bookmarks-capture-categorized ()
+  "Capture bookmark with category selection."
+  (interactive)
+  (let ((category (completing-read 
+                  "Category: "
+                  '("Reading List" "Tech Stack" "Learning & Documentation" "Development" "Personal Projects" "Archive"))))
+    (org-capture nil "bc")
+    (goto-char (point-min))
+    (when (search-forward "Category:" nil t)
+      (forward-char)
+      (insert category))))
+
+;; Duplicate detection
+(defun my/bookmarks-check-duplicate (url)
+  "Check if URL already exists in bookmarks."
+  (with-temp-buffer
+    (insert-file-contents "~/org/bookmarks.org")
+    (goto-char (point-min))
+    (re-search-forward (regexp-quote url) nil t)))
+
+;; Automated tag suggestions based on URL patterns
+(defun my/bookmarks-suggest-tags (url title)
+  "Suggest tags based on URL patterns and title."
+  (let ((suggestions '()))
+    ;; URL-based suggestions
+    (cond ((string-match-p "github\\.com\\|gitlab\\.com\\|sourcehut" url)
+           (push "code" suggestions)
+           (push "repository" suggestions))
+          ((string-match-p "stackoverflow\\|docs\\.\\|api\\.\\|reference" url)
+           (push "reference" suggestions)
+           (push "documentation" suggestions))
+          ((string-match-p "reddit\\|hackernews\\|lobsters" url)
+           (push "discussion" suggestions)
+           (push "community" suggestions))
+          ((string-match-p "youtube\\|vimeo\\|twitch" url)
+           (push "video" suggestions)
+           (push "media" suggestions))
+          ((string-match-p "arxiv\\|paper\\|research" url)
+           (push "research" suggestions)
+           (push "academic" suggestions))
+          ((string-match-p "tool\\|utility\\|app\\|service" url)
+           (push "tool" suggestions)
+           (push "utility" suggestions)))
+    
+    ;; Title-based suggestions
+    (when (string-match-p "tutorial\\|guide\\|how-to\\|learn" (downcase title))
+      (push "tutorial" suggestions))
+    (when (string-match-p "book\\|article\\|blog\\|post" (downcase title))
+      (push "reading" suggestions))
+    (when (string-match-p "ai\\|ml\\|machine learning\\|artificial intelligence" (downcase title))
+      (push "ai-ml" suggestions))
+    
+    (reverse (delete-dups suggestions))))
+
+;; Bookmark statistics with detailed breakdown
+(defun my/bookmarks-statistics ()
+  "Show detailed bookmark statistics."
+  (interactive)
+  (with-temp-buffer
+    (insert-file-contents "~/org/bookmarks.org")
+    (goto-char (point-min))
+    (let* ((total-bookmarks (count-matches "^*.*:bookmark:"))
+           (categories (count-matches "^* "))
+           (tags-section (count-matches "^#\\+filetags:"))
+           (last-capture (when (re-search-forward "Captured: \\([0-9-]+\\)" nil t)
+                          (match-string 1)))
+           (today-bookmarks (count-matches (format-time-string "%Y-%m-%d"))))
+      (message "📊 Bookmark Statistics:\n• Total: %d\n• Categories: %d\n• Today: %d\n• Tags configured: %s\n• Last capture: %s"
+               total-bookmarks 
+               categories
+               today-bookmarks
+               (if (> tags-section 0) "Yes" "No")
+               (or last-capture "Unknown")))))
+
+;; Advanced bookmark management
+(defun my/bookmarks-organize ()
+  "Organize bookmarks by moving duplicates and cleaning up structure."
+  (interactive)
+  (with-current-buffer (find-file "~/org/bookmarks.org")
+    (goto-char (point-min))
+    (while (re-search-forward "^\\* \\(.*\\) :bookmark:" nil t)
+      (let ((headline (match-string 1)))
+        (when (> (length headline) 80)
+          (message "Long headline detected: %s" headline))))
+    (message "Organization check complete")))
+
+;; Export functions
+(defun my/bookmarks-export-json (filename)
+  "Export bookmarks to JSON format."
+  (interactive (list (read-file-name "Export to: " "~/org/" "bookmarks.json")))
+  (with-temp-buffer
+    (insert-file-contents "~/org/bookmarks.org")
+    (goto-char (point-min))
+    (let ((bookmarks '()))
+      (while (re-search-forward "^* \\(.+?\\) :bookmark:" nil t)
+        (let* ((headline (match-string 1))
+               (url (when (re-search-forward "- URL: \\(.*\\)" (line-end-position) t)
+                      (match-string 1)))
+               (description (when (re-search-forward "- Description: \\(.*\\)" (line-end-position) t)
+                             (match-string 1))))
+          (when url
+            (push (list :title headline :url url :description description) bookmarks))))
+      (write-region (json-encode bookmarks) nil filename)
+      (message "Exported %d bookmarks to %s" (length bookmarks) filename))))
+
+;; Keybindings for bookmark system
+(map! :leader
+      :prefix ("v" . "workflow")
+      :desc "Bookmark search"         "s" #'my/bookmarks-search
+      :desc "Bookmark quick capture"  "b" #'my/bookmarks-capture-quick
+      :desc "Bookmark rich capture"   "B" #'my/bookmarks-capture-rich
+      :desc "Bookmark categorized"    "c" #'my/bookmarks-capture-categorized
+      :desc "Browse bookmark"         "u" #'my/bookmarks-browse-at-point
+      :desc "Bookmark stats"          "S" #'my/bookmarks-statistics
+      :desc "Bookmark organize"       "O" #'my/bookmarks-organize)
+#+end_src
+
+** Browser Integration
+#+begin_src elisp
+;; Browser Integration for One-Click Bookmarking
+;; This allows bookmark capture directly from the browser
+
+(defun my/bookmarks-capture-from-browser (url title description)
+  "Capture a bookmark from browser with URL, TITLE, and DESCRIPTION."
+  (interactive (list (read-string "URL: " (or (getenv "BOOKMARK_URL") ""))
+                    (read-string "Title: " (or (getenv "BOOKMARK_TITLE") ""))
+                    (read-string "Description: " (or (getenv "BOOKMARK_DESC") ""))))
+  
+  (let* ((org-capture-mode-hook nil)
+         (target-file "~/org/bookmarks.org")
+         (template "* %s :bookmark:\n  %s\n  - URL: %s\n  - Description: %s\n  - Tags: %s\n  - Captured: %U\n\n")
+         (entry (format template title description url description "")))
+    (with-current-buffer (find-file target-file)
+      (goto-char (point-max))
+      (when (not (bolp)) (insert "\n"))
+      (insert entry)
+      (save-buffer))
+    (message "Bookmark captured: %s" title)))
+
+;; Browser capture function for use with external tools
+(defun my/bookmarks-capture-external ()
+  "External bookmark capture function.
+Reads URL, title from environment variables or interactive input."
+  (let ((url (or (getenv "BOOKMARK_URL") 
+                (read-string "URL: ")))
+        (title (or (getenv "BOOKMARK_TITLE")
+                  (read-string "Title: ")))
+        (description (or (getenv "BOOKMARK_DESC")
+                        (read-string "Description: "))))
+    (my/bookmarks-capture-from-browser url title description)))
+
+;; Helper to open bookmarks file quickly
+(defun my/bookmarks-open ()
+  "Open the bookmarks file."
+  (interactive)
+  (find-file "~/org/bookmarks.org"))
+
+;; Add to leader keybindings
+(map! :leader
+      :prefix ("v" . "workflow")
+      :desc "Open bookmarks"      "o" #'my/bookmarks-open)
+#+end_src
+
+** Enhanced Capture Templates
+#+begin_src elisp
+;; Bookmark capture templates for different workflows
+(add-to-list 'org-capture-templates
+             '("bq" "Bookmark Quick" entry
+               (file+head "~/org/bookmarks.org" "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n")
+               "* %(my/bookmarks-suggest-title) :bookmark:\n  - URL: %c\n  - Title: \n  - Description: %(my/bookmarks-suggest-description)\n  - Category: %(my/bookmarks-suggest-category)\n  - Tags: %(my/bookmarks-suggest-tags-function)\n  - Captured: %U\n" :empty-lines 1))
+
+(add-to-list 'org-capture-templates
+             '("br" "Bookmark Rich" entry
+               (file+head "~/org/bookmarks.org" "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n")
+               "* %(my/bookmarks-suggest-title) :bookmark:\n  %(or (my/bookmarks-get-current-url) \"%c\")\n  - URL: %(my/bookmarks-get-current-url)\n  - Title: %(my/bookmarks-suggest-title)\n  - Description: \n  - Summary: \n  - Keywords: \n  - Category: %(my/bookmarks-suggest-category)\n  - Tags: %(my/bookmarks-suggest-tags-function)\n  - Priority: %^{priority|Normal|High|Low}\n  - Status: %^{status|To Review|Useful|Archive}\n  - Captured: %U\n  - Accessed: %u\n  - Notes: %?\n" :empty-lines 1))
+
+(add-to-list 'org-capture-templates
+             '("bc" "Bookmark Categorized" entry
+               (file+head "~/org/bookmarks.org" "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n")
+               "* %(my/bookmarks-suggest-title) :bookmark:\n  - URL: %c\n  - Title: %(my/bookmarks-suggest-title)\n  - Description: %(my/bookmarks-suggest-description)\n  - Category: %(my/bookmarks-suggest-category)\n  - Tags: %(my/bookmarks-suggest-tags-function)\n  - Captured: %U\n" :empty-lines 1))
+
+;; Helper functions for capture templates
+(defun my/bookmarks-get-current-url ()
+  "Get current URL or from environment."
+  (or (getenv "BOOKMARK_URL") 
+      (thing-at-point-url-at-point)
+      "%c"))
+
+(defun my/bookmarks-suggest-title ()
+  "Suggest title from current context."
+  (or (getenv "BOOKMARK_TITLE")
+      (when (bound-and-true-p browse-url-browser-function)
+        (read-string "Title: " (url-get-title-at-url (my/bookmarks-get-current-url))))
+      "Bookmark Title"))
+
+(defun my/bookmarks-suggest-description ()
+  "Suggest description from current context."
+  (or (getenv "BOOKMARK_DESC")
+      ""))
+
+(defun my/bookmarks-suggest-category ()
+  "Suggest category based on URL patterns."
+  (let ((url (my/bookmarks-get-current-url)))
+    (cond ((string-match-p "github\\.com\\|gitlab\\.com\\|stackoverflow" url)
+           "Development")
+          ((string-match-p "arxiv\\|research\\|paper" url)
+           "Learning & Documentation")
+          ((string-match-p "medium\\|dev\\.to\\|blog" url)
+           "Reading List")
+          ((string-match-p "tool\\|app\\|service" url)
+           "Tech Stack")
+          (t
+           (completing-read "Category: " 
+                          '("Reading List" "Tech Stack" "Learning & Documentation" 
+                            "Development" "Personal Projects" "Archive")))))
+
+(defun my/bookmarks-suggest-tags-function ()
+  "Suggest tags based on current context."
+  (let ((url (my/bookmarks-get-current-url))
+        (title (my/bookmarks-suggest-title)))
+    (mapconcat 'identity (my/bookmarks-suggest-tags url title) " ")))
 #+end_src

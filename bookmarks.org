@@ -1,0 +1,32 @@
+# -*- mode: org; buffer-read-only: t -*-
+#+title: Web Bookmarks
+#+filetags: :bookmarks:
+
+* Reading List
+** TODO
+
+** DONE
+
+* Tech Stack
+** Languages
+** Frameworks
+** Tools & Utilities
+** AI/ML
+
+* Learning & Documentation
+** Tutorials
+** Reference
+** Blogs & Articles
+
+* Development
+** Resources
+** Snippets
+** APIs
+
+* Personal Projects
+** Ideas
+** Research
+
+* Archive
+** Old but useful
+** Historical

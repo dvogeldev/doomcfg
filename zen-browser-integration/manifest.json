@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Doom Emacs Bookmarks",
+  "version": "1.0.0",
+  "description": "Capture bookmarks directly to your Doom Emacs org-mode bookmarks file",
+  "permissions": ["activeTab", "storage", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Doom Emacs Bookmarks"
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "commands": {
+    "quick-capture": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
+      },
+      "description": "Quick bookmark capture to Doom Emacs"
+    },
+    "rich-capture": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+B",
+        "mac": "Command+Alt+B"
+      },
+      "description": "Rich bookmark capture to Doom Emacs"
+    }
+  }
+}
