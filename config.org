@@ -1,747 +1,180 @@
-#+title: Literate Doom Emacs Configuration
-#+PROPERTY: header-args:elisp :tangle config.el
-#+STARTUP: folded
+#+title: David Vogel's Clean Doom Emacs Config
+#+author: David Vogel
+#+date: <2025-11-25>
+#+description: Minimal, fast, beautiful — built on Doom’s excellent defaults + one perfect bookmark template
+#+property: header-args:elisp :tangle config.el :mkdirp yes
+#+startup: overview
 
-* Table of Contents :toc:
-- [[#boilerplate][Boilerplate]]
-- [[#initial-setup][Initial Setup]]
-  - [[#startup-optimizations][Startup Optimizations]]
-  - [[#identity--auth][Identity & Auth]]
-  - [[#keychain--ssh-agent][Keychain / SSH Agent]]
-  - [[#fonts][Fonts]]
-  - [[#theme--ui][Theme & UI]]
-  - [[#frame-transparency][Frame Transparency]]
-  - [[#indenting][Indenting]]
-  - [[#cursor-blink][Cursor Blink]]
-  - [[#line-wrapping--line-numbers][Line Wrapping & Line Numbers]]
-  - [[#trash--auto-saving][Trash & Auto Saving]]
-  - [[#general-performance--system-tweaks][General Performance / System Tweaks]]
-  - [[#browser-integration][Browser Integration]]
-  - [[#which-key-speed][Which-Key Speed]]
-- [[#completion-stack-vertico--orderless--consult--embark][Completion Stack (Vertico / Orderless / Consult / Embark)]]
-  - [[#minibuffer-completion-defaults][Minibuffer Completion Defaults]]
-  - [[#savehist-minibuffer-history][Savehist (minibuffer history)]]
-  - [[#vertico][Vertico]]
-  - [[#orderless][Orderless]]
-  - [[#vertico-repeat][Vertico Repeat]]
-  - [[#marginalia][Marginalia]]
-  - [[#embark-keybindings][Embark Keybindings]]
-  - [[#consult-search--jump-like-telescope][Consult (Search / Jump, like Telescope)]]
-  - [[#consult-dir][Consult-Dir]]
-- [[#company-configuration][Company Configuration]]
-- [[#org-mode][Org Mode]]
-  - [[#capture-templates][Capture Templates]]
-  - [[#refiling-setup][Refiling setup]]
-  - [[#keywords][keywords]]
-  - [[#one-key-daily-agenda--inbox-review][One-Key daily agenda + inbox review]]
-- [[#web-bookmarks-capture-system][Web Bookmarks Capture System]]
-  - [[#browser-integration-1][Browser Integration]]
-  - [[#enhanced-capture-templates][Enhanced Capture Templates]]
+* Introduction
+* Table of Contents                                             :toc:
+- [[#introduction][Introduction]]
+- [[#identity][Identity]]
+- [[#fonts][Fonts]]
+- [[#theme--ui][Theme & UI]]
+- [[#general-behavior][General Behavior]]
+- [[#performance--startup][Performance & Startup]]
+- [[#completion-tweaks][Completion Tweaks]]
+- [[#in-buffer-completion-company][In-Buffer Completion (Company)]]
+- [[#org-mode--dooms-defaults--bookmark-capture][Org Mode — Doom’s defaults + bookmark capture]]
+  - [[#daily-review--still-the-best-two-pane-workflow][Daily Review — still the best two-pane workflow]]
+- [[#keybindings][Keybindings]]
+  - [[#fixed-safer-binding-to-avoid-prefix-conflicts][FIXED: Safer binding to avoid prefix conflicts]]
+- [[#system-integration][System Integration]]
+  - [[#ssh-agent-via-gpg][SSH Agent via GPG]]
+  - [[#final-touch][Final touch]]
 
-* Boilerplate
+* Identity
 #+begin_src elisp
-;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
-#+end_src
-
-* Initial Setup
-
-** Startup Optimizations
-#+begin_src elisp
-;; Maximum GC threshold during startup - prevent collections entirely
-(setq gc-cons-threshold most-positive-fixnum
-      gc-cons-percentage 1.0)
-
-;; Restore GC after startup with an idle-timer for smoother operation
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            ;; Reasonable GC settings for normal use
-            (setq gc-cons-threshold (* 256 1024 1024)  ; 256MB
-                  gc-cons-percentage 0.1)
-            ;; GC when idle (5 seconds of no input, and no minibuffer)
-            (run-with-idle-timer
-             5 t
-             (lambda ()
-               (unless (active-minibuffer-window)
-                 (garbage-collect))))))
-
-;; Reduce startup noise / layout jitter
-(setq inhibit-compacting-font-caches t
-      inhibit-startup-screen t
-      initial-scratch-message nil
-      frame-inhibit-implied-resize t)  ; also good on Wayland/XWayland
-
-;; Keep use-package behavior close to Doom defaults
-;; (optional micro-optimization)
-(setq use-package-expand-minimally t)
-
-;; Doom's incremental loading – slightly relaxed so it interferes less
-(setq doom-incremental-idle-timer 10.0
-      doom-incremental-first-idle-timer 5.0)
-#+end_src
-
-** Identity & Auth
-#+begin_src elisp
-;; Some functionality uses this to identify you, e.g. GPG configuration,
-;; email clients, file templates and snippets.
 (setq user-full-name "David Vogel"
       user-mail-address "dvogelca@proton.me")
-
-(setq auth-sources '("~/.authinfo.gpg" "~/.authinfo")
-      auth-source-cache-expiry nil) ; default is 7200 (2h)
 #+end_src
 
-** Keychain / SSH Agent
-Using ssh keys for various servers/repos, easiest way to keep this persistent.
+* Fonts
+#+begin_src elisp
+(setq doom-font (font-spec :family "Hasklug Nerd Font Mono" :size 16 :weight 'semi-light)
+      doom-variable-pitch-font (font-spec :family "Alegreya" :size 18)
+      doom-big-font (font-spec :family "Hasklug Nerd Font Mono" :size 22))
+#+end_src
+
+* Theme & UI
+#+begin_src elisp
+(setq doom-theme 'modus-vivendi-tinted)
+(add-to-list 'default-frame-alist '(undecorated . t))
+(set-frame-parameter (selected-frame) 'alpha '(96 . 97))
+(add-to-list 'default-frame-alist '(alpha . (96 . 97)))
+
+(setq doom-modeline-icon t
+      doom-modeline-major-mode-icon t
+      doom-modeline-lsp t
+      doom-modeline-major-mode-color-icon t)
+
+(use-package! golden-ratio
+     :defer t
+     :config
+     (golden-ratio-mode 1)
+     (set golden-ratio-adjust-factor 1.05 ))
+(map! :leader
+      :desc "Toggle golden-ratio" "t G" #'golden-ratio-mode)
+#+end_src
+
+* General Behavior
+#+begin_src elisp
+(setq display-line-numbers-type 'relative
+      which-key-idle-delay 0.2
+      delete-by-moving-to-trash t
+      auto-save-default t
+      browse-url-browser-function 'browse-url-generic
+      browse-url-generic-program "zen-browser")
+#+end_src
+
+* Performance & Startup
+#+begin_src elisp
+(setq gc-cons-threshold (* 256 1024 1024)
+      gc-cons-percentage 0.1
+      read-process-output-max (* 4 1024 1024)
+      native-comp-async-jobs 4
+      comp-deferred-compilation t
+      vc-handled-backends '(Git))
+#+end_src
+
+* Completion Tweaks
+#+begin_src elisp
+(after! vertico
+  (setq vertico-count 17 vertico-resize t vertico-cycle t))
+
+(after! orderless
+  (setq completion-styles '(orderless basic)
+        completion-category-overrides '((file (styles basic partial-completion orderless)))))
+
+(after! consult
+  (setq consult-preview-key "M-." consult-narrow-key "<"))
+
+(after! marginalia
+  (setq marginalia-align 'right))
+#+end_src
+
+* In-Buffer Completion (Company)
+#+begin_src elisp
+(after! company
+  (setq company-idle-delay 0.2
+        company-minimum-prefix-length 2
+        company-show-quick-access t))
+#+end_src
+
+* Org Mode — Doom’s defaults + bookmark capture
+We keep everything Doom gives us (pretty bullets, roam, refile, agenda, etc.) and add **one** excellent bookmark template.
 
 #+begin_src elisp
-;; Set SSH_AUTH_SOCK from gpg-agent keychain (systemd user unit)
+(setq org-directory "~/org/"
+      org-agenda-files '("~/org/")
+      org-default-notes-file "~/org/inbox.org"
+      org-roam-directory "~/org/notes")
+
+;; One perfect bookmark capture template
+;; Use `SPC n c b` → instantly saves URL + title + selection + timestamp
+;; Works from anywhere (browser via bookmarklet, Emacs buffer, etc.)
+(setq org-capture-templates
+      '(("b" "Bookmark" entry
+         (file+headline "~/org/bookmarks.org" "Inbox")
+         "* [[%^{URL}][%^{Title}]]   :bookmark:\n:PROPERTIES:\n:CREATED: %U\n:END:\n%?\n%i\n"
+         :empty-lines 1
+         :immediate-finish t)))
+
+;; Optional: auto-create bookmarks.org if it doesn't exist (safe, idempotent)
+(unless (file-exists-p "~/org/bookmarks.org")
+  (with-temp-file "~/org/bookmarks.org"
+    (insert "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n\n* Inbox\n")))
+#+end_src
+
+** Daily Review — still the best two-pane workflow
+#+begin_src elisp
+(defun my/daily-review ()
+  "Today’s agenda + inbox side-by-side."
+  (interactive)
+  (org-agenda nil "d")
+  (delete-other-windows)
+  (split-window-right)
+  (find-file org-default-notes-file))
+#+end_src
+
+* Keybindings
+Everything under =SPC n= (notes/workflow) — clean and discoverable.
+
+** FIXED: Safer binding to avoid prefix conflicts
+We use `general-def` to explicitly unbind/override any conflicting `n r` from Evil defaults, then bind safely.
+
+#+begin_src elisp
+(after! evil  ; Wait for Evil to load its defaults
+  (general-def
+    :states 'normal
+    :keymaps 'override  ; Override any Doom/Evil defaults
+    :prefix "SPC n"     ; Single-level prefix (no sub-nesting)
+    "" 'which-key-show-major-mode  ; Show help for this prefix
+    "a" '(org-agenda :wk "Org agenda")
+    "c" '(org-capture :wk "Org capture")
+    "b" '(lambda () (interactive) (org-capture nil "b") :wk "Capture bookmark")
+    "i" '(lambda () (interactive) (find-file org-default-notes-file) :wk "Open inbox")
+    "B" '(lambda () (interactive) (find-file "~/org/bookmarks.org") :wk "Open bookmarks")
+    "d" '(my/daily-review :wk "Daily review")
+    "f" '(org-roam-node-find :wk "Roam find")
+    "r" '(org-roam-capture :wk "Roam capture"))  ; ← This overrides any conflicting "n r"
+  ;; Explicitly clear any sub-prefix under "n r" if it exists from Evil
+  (general-unbind
+    :keymaps 'leader-minor-mode-keymap
+    "n r"))
+#+end_src
+
+* System Integration
+** SSH Agent via GPG
+#+begin_src elisp
 (setenv "SSH_AUTH_SOCK"
         (concat (or (getenv "XDG_RUNTIME_DIR")
                     (format "/run/user/%d" (user-uid)))
                 "/gnupg/S.gpg-agent.ssh"))
 #+end_src
 
-** Fonts
-I really like GeistMono as a replacement for SourceCode Pro. Alegreya is a great writing font.
-
+** Final touch
 #+begin_src elisp
-(setq doom-font (font-spec :family "Hasklug Nerd Font Mono" :size 16)
-      doom-variable-pitch-font (font-spec :family "Alegreya" :size 18)
-      doom-big-font (font-spec :family "Hasklug Nerd Font Mono" :size 22))
-#+end_src
-
-** Theme & UI
-#+begin_src elisp
-(setq doom-theme 'modus-vivendi-tinted)
-
-;; Maintain terminal transparency in Doom Emacs
-(after! doom-themes
-  (unless (display-graphic-p)
-    (set-face-background 'default "undefined")))
-
-;; Remove top frame bar in Emacs
-(add-to-list 'default-frame-alist '(undecorated . t))
-
-;; Modeline appearance
-(setq doom-modeline-icon t
-      doom-modeline-major-mode-icon t
-      doom-modeline-lsp-icon t
-      doom-modeline-major-mode-color-icon t)
-
-;; Golden Ratio
-(use-package! golden-ratio
-  :config
-  (setq golden-ratio-auto-scale t)
-  (golden-ratio-mode 1))
-#+end_src
-
-** Frame Transparency
-#+begin_src elisp
-(set-frame-parameter (selected-frame) 'alpha '(96 . 97))
-(add-to-list 'default-frame-alist '(alpha . (96 . 97)))
-#+end_src
-
-** Indenting
-#+begin_src elisp
-;; Aggressive indent can be nice but sometimes intrusive.
-;; Uncomment if you want it globally in prog-mode.
-;; (use-package! aggressive-indent
-;;   :hook (prog-mode . aggressive-indent-mode))
-#+end_src
-
-** Cursor Blink
-#+begin_src elisp
-(blink-cursor-mode 1)
-#+end_src
-
-** Line Wrapping & Line Numbers
-We set visual line wrapping and relative line numbers so motions are easier.
-
-#+begin_src elisp
-;; Line numbers: nil, t, or 'relative
-(setq display-line-numbers-type 'relative)
-
-;; Soft wrapping by default
-(global-visual-line-mode t)
-#+end_src
-
-** Trash & Auto Saving
-#+begin_src elisp
-;; Send files to trash instead of fully deleting
-(setq delete-by-moving-to-trash t)
-
-;; Enable simple auto-save
-(setq auto-save-default t)
-#+end_src
-
-** General Performance / System Tweaks
-#+begin_src elisp
-;; Increase amount of data Emacs reads from processes (LSP, etc.)
-(setq read-process-output-max (* 4 1024 1024)) ; 4MB
-
-;; Native compilation tweaks
-(setq comp-deferred-compilation t
-      comp-async-jobs-number 4) ; a bit gentler than 8 on Ryzen 3
-
-;; VC: only handle Git for speed (especially with TRAMP)
-(setq vc-handled-backends '(Git))
-
-;; Pointer focus behavior
-(setq focus-follows-mouse nil)
-#+end_src
-
-** Browser Integration
-Using Zen Browser via generic browse-url.
-
-#+begin_src elisp
-;; Use a specific external browser
-(setq browse-url-browser-function 'browse-url-generic
-      browse-url-generic-program "zen-browser")  ; adjust if needed
-#+end_src
-
-** Which-Key Speed
-#+begin_src elisp
-(setq which-key-idle-delay 0.2)
-#+end_src
-
-* Completion Stack (Vertico / Orderless / Consult / Embark)
-
-** Minibuffer Completion Defaults
-#+begin_src elisp
-;; Make completion case-insensitive where it makes sense
-(setq read-file-name-completion-ignore-case t
-      read-buffer-completion-ignore-case t
-      completion-ignore-case t)
-
-;; Use the familiar C-x C-f interface for directory completion in minibuffer
-(map! :map minibuffer-mode-map
-      :when (modulep! :completion vertico)
-      "C-x C-f" #'find-file)
-#+end_src
-
-** Savehist (minibuffer history)
-#+begin_src elisp
-(use-package! savehist
-  :config
-  (setq savehist-file (concat doom-cache-dir "savehist")
-        savehist-save-minibuffer-history t
-        history-length 1000
-        history-delete-duplicates t
-        savehist-additional-variables
-        '(search-ring
-          regexp-search-ring
-          extended-command-history))
-  (savehist-mode 1))
-#+end_src
-
-** Vertico
-#+begin_src elisp
-(after! vertico
-  ;; Tidy file paths in minibuffer
-  (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
-
-  (define-key vertico-map (kbd "DEL")   #'vertico-directory-delete-char)
-  (define-key vertico-map (kbd "M-DEL") #'vertico-directory-delete-word)
-
-  ;; Display / navigation tweaks
-  (setq vertico-count 17
-        vertico-cycle t
-        vertico-resize t
-        vertico-sort-function #'vertico-sort-history-alpha)
-
-  (define-key vertico-map (kbd "C-j")   #'vertico-next)
-  (define-key vertico-map (kbd "C-k")   #'vertico-previous)
-  (define-key vertico-map (kbd "M-RET") #'vertico-exit-input)
-
-  ;; History navigation
-  (define-key vertico-map (kbd "M-p") #'vertico-previous-history)
-  (define-key vertico-map (kbd "M-n") #'vertico-next-history)
-  (define-key vertico-map (kbd "C-r") #'consult-history)
-
-#+end_src
-** Orderless
-#+begin_src elisp
-  ;; Orderless: flexible, fuzzy-ish matching
-  (setq completion-styles '(orderless basic)
-        completion-category-defaults nil
-        completion-category-overrides
-        '((file (styles basic partial-completion orderless))))
-
-  (setq orderless-component-separator #'orderless-escapable-split-on-space
-        orderless-matching-styles
-        '(orderless-literal
-          orderless-prefixes
-          orderless-initialism
-          orderless-flex
-          orderless-regexp)))
-#+end_src
-
-** Vertico Repeat
-#+begin_src elisp
-(use-package! vertico-repeat
-  :after vertico
-  :config
-  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
-  (map! :leader
-        (:prefix "r"
-         :desc "Repeat last Vertico session" "v" #'vertico-repeat)))
-#+end_src
-
-** Marginalia
-#+begin_src elisp
-(after! marginalia
-  (setq marginalia-annotators
-        '(marginalia-annotators-heavy
-          marginalia-annotators-light
-          nil)
-        marginalia-max-relative-age 0
-        marginalia-align 'right))
-#+end_src
-
-** Embark Keybindings
-#+begin_src elisp
-(map! :leader
-      (:prefix ("k" . "embark")  ;; 'k' to avoid conflicts with other apps
-       :desc "Embark act"     "a" #'embark-act
-       :desc "Embark dwim"    "d" #'embark-dwim
-       :desc "Embark collect" "c" #'embark-collect))
-#+end_src
-
-** Consult (Search / Jump, like Telescope)
-#+begin_src elisp
-(after! consult
-  (setq consult-preview-key "M-."
-        consult-ripgrep-args
-        "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --with-filename --line-number --search-zip"
-        consult-narrow-key "<"
-        consult-line-numbers-widen t
-        consult-async-min-input 2
-        consult-async-refresh-delay 0.15
-        consult-async-input-throttle 0.2
-        consult-async-input-debounce 0.1)
-
-  ;; More useful previews for various commands
-  (consult-customize
-   consult-theme
-   consult-ripgrep
-   consult-git-grep
-   consult-grep
-   consult-bookmark
-   consult-recent-file
-   consult-xref
-   :preview-key '(:debounce 0.4 any)))
-#+end_src
-
-** Consult-Dir
-#+begin_src elisp
-(use-package! consult-dir
-  :bind (("C-x C-d" . consult-dir)
-         :map vertico-map
-         ("C-x C-d" . consult-dir)
-         ("C-x C-j" . consult-dir-jump-file)))
-
-(map! :leader
-      (:prefix "s"
-       :desc "Consult command history" "h" #'consult-history
-       :desc "Consult recent directories" "d" #'consult-dir))
-#+end_src
-
-* Company Configuration
-#+begin_src elisp
-;; NOTE: If you decide to go all-in on Corfu, you can safely remove this
-;; entire block *and* the `company` module from :completion in init.el.
-
-(after! company
-  (setq company-minimum-prefix-length 2
-        company-idle-delay 0.2
-        company-show-quick-access t
-        company-tooltip-limit 20
-        company-tooltip-align-annotations t)
-
-  ;; Make company-files a higher priority backend
-  (setq company-backends (cons 'company-files
-                               (delete 'company-files company-backends)))
-
-  ;; Better file path completion settings
-  (setq company-files-exclusions nil
-        company-files-chop-trailing-slash t)
-
-  ;; Enable completion at point for file paths
-  (defun my/enable-path-completion ()
-    "Enable file path completion using company-files."
-    (setq-local company-backends
-                (cons 'company-files company-backends)))
-
-  ;; Enable for all major modes
-  (add-hook 'after-change-major-mode-hook #'my/enable-path-completion)
-
-  ;; Heuristic: detect path-like input for a custom backend
-  (defun my/looks-like-path-p (input)
-    "Check if INPUT looks like a file path."
-    (or (string-match-p "^/" input)       ;; Absolute path
-        (string-match-p "^~/" input)      ;; Home directory
-        (string-match-p "^\\.\\{1,2\\}/" input))) ;; ./ or ../ relative path
-
-  (defun my/company-path-trigger (command &optional arg &rest ignored)
-    "Company backend that triggers file completion for path-like input."
-    (interactive (list 'interactive))
-    (cl-case command
-      (interactive (company-begin-backend 'company-files))
-      (prefix (when (my/looks-like-path-p
-                     (or (company-grab-line "\\([^ ]*\\)" 1) ""))
-                (company-files 'prefix)))
-      (t (apply #'company-files command arg ignored))))
-
-  ;; Add the custom path trigger to backends
-  (add-to-list 'company-backends 'my/company-path-trigger))
-#+end_src
-* Org Mode
-#+begin_src elisp
-(setq org-directory "~/org/"
-      org-agenda-files '("~/org/todo.org" "~/org/agenda.org" "~/org/bookmarks.org")
-      org-default-notes-file "~/org/inbox.org"
-
-      ;; Org-roam basic setup
-      org-roam-directory "~/org/notes"
-      org-roam-capture-templates
-      '(("d" "default" plain
-         "%?"
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
-         :unnarrowed t)))
-
-;; Keybindings — muscle memory heaven
-(map! :leader
-      :prefix ("v" . "workflow")
-      :desc "Agenda"              "a" #'org-agenda
-      :desc "Capture note/todo"   "c" #'org-capture
-      :desc "Roam find"           "f" #'org-roam-node-find
-      :desc "Roam capture"        "i" #'org-roam-capture
-      :desc "Refile"              "r" #'org-refile
-      :desc "Inbox - review"      "I" (lambda () (interactive) (find-file "~/org/inbox.org"))
-      :desc "Daily review"        "d" #'my/daily-review)
-
-#+end_src
-** Capture Templates
-#+begin_src elisp
-(setq org-capture-templates
-      '(("t" "Todo" entry
-         (file "~/org/inbox.org")
-         "* TODO %?\n  %i\n  %a" :empty-lines 1)
-
-        ("n" "Note" entry
-         (file "~/org/inbox.org")
-         "* %? :note:\n  %i\n  %U" :empty-lines 1)
-
-        ("m" "Meeting" entry
-         (file "~/org/inbox.org")
-         "* MEETING %? :meeting:\n  %U" :empty-lines 1)
-
-        ("r" "Roam note" plain
-         #'org-roam-capture--capture   ; the function
-         "%?"
-         :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
-                            "#+title: ${title}\n")
-         :immediate-finish t
-         :unnarrowed t)))
-#+end_src
-
-** Refiling setup
-#+begin_src elisp
-(setq org-refile-targets '(("~/org/todo.org" :maxlevel . 2)
-                           ("~/org/agenda.org" :maxlevel . 2)
-                           (org-agenda-files :maxlevel . 2)
-                           ("~/org/notes" :maxlevel . 2)))  ; allows refiling to roam nodes too
-
-(setq org-refile-use-outline-path 'file   ; shows filenames in refile menu
-      org-outline-path-complete-in-steps nil)
-
-#+end_src
-** Todo keywords
-#+begin_src elisp
-(setq org-todo-keywords
-      '((sequence "TODO(t)" "NEXT(n)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
-#+end_src
-** One-Key daily agenda + inbox review
-#+begin_src elisp
-(defun my/daily-review ()
-  (interactive)
-  (org-agenda nil "n")      ; custom agenda view showing inbox + today
-  (delete-other-windows)
-  (split-window-right)
-  (find-file "~/org/inbox.org"))
-
-(map! :leader :desc "Daily review" "o d" #'my/daily-review)
-
-#+end_src
-* Web Bookmarks Capture System
-#+begin_src elisp
-;; Bookmark Management Functions
-
-;; Enhanced search with better filtering
-(defun my/bookmarks-search (&optional query)
-  "Search through bookmarks using consult-ripgrep with filtering.
-With QUERY, use it as initial search term."
-  (interactive)
-  (let ((consult-ripgrep-args
-         "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --with-filename --line-number --search-zip"))
-    (consult-ripgrep "~/org/bookmarks.org" query)))
-
-;; Browse bookmark at point with better error handling
-(defun my/bookmarks-browse-at-point ()
-  "Open the URL at point in the default browser."
-  (interactive)
-  (let ((url (org-entry-get (point) "URL")))
-    (if url
-        (browse-url url)
-      (message "No URL found at point"))))
-
-;; Enhanced quick capture with auto-detection
-(defun my/bookmarks-capture-quick ()
-  "Quick bookmark capture with minimal prompts and auto-detection."
-  (interactive)
-  (let* ((current-url (or (thing-at-point-url-at-point)
-                         (when (bound-and-true-p browse-url-browser-function)
-                           (read-string "URL: "))))
-         (title (when current-url
-                  (or (getenv "BOOKMARK_TITLE")
-                      (read-string "Title: " (url-get-title-at-url current-url))))))
-    (let ((org-capture-mode-hook nil))
-      (org-capture nil "bq"))
-    (when current-url
-      (goto-char (point-min))
-      (when (search-forward "URL:" nil t)
-        (forward-char)
-        (insert current-url))
-      (when (search-forward "Title:" nil t)
-        (forward-char)
-        (insert title)))))
-
-;; Rich capture with full metadata editing
-(defun my/bookmarks-capture-rich ()
-  "Rich bookmark capture with full metadata editing."
-  (interactive)
-  (org-capture nil "br"))
-
-;; Categorized capture with target selection
-(defun my/bookmarks-capture-categorized ()
-  "Capture bookmark with category selection."
-  (interactive)
-  (let ((category (completing-read 
-                  "Category: "
-                  '("Reading List" "Tech Stack" "Learning & Documentation" "Development" "Personal Projects" "Archive"))))
-    (org-capture nil "bc")
-    (goto-char (point-min))
-    (when (search-forward "Category:" nil t)
-      (forward-char)
-      (insert category))))
-
-;; Duplicate detection
-(defun my/bookmarks-check-duplicate (url)
-  "Check if URL already exists in bookmarks."
-  (with-temp-buffer
-    (insert-file-contents "~/org/bookmarks.org")
-    (goto-char (point-min))
-    (re-search-forward (regexp-quote url) nil t)))
-
-;; Automated tag suggestions based on URL patterns
-(defun my/bookmarks-suggest-tags (url title)
-  "Suggest tags based on URL patterns and title."
-  (let ((suggestions '()))
-    ;; URL-based suggestions
-    (cond ((string-match-p "github\\.com\\|gitlab\\.com\\|sourcehut" url)
-           (push "code" suggestions)
-           (push "repository" suggestions))
-          ((string-match-p "stackoverflow\\|docs\\.\\|api\\.\\|reference" url)
-           (push "reference" suggestions)
-           (push "documentation" suggestions))
-          ((string-match-p "reddit\\|hackernews\\|lobsters" url)
-           (push "discussion" suggestions)
-           (push "community" suggestions))
-          ((string-match-p "youtube\\|vimeo\\|twitch" url)
-           (push "video" suggestions)
-           (push "media" suggestions))
-          ((string-match-p "arxiv\\|paper\\|research" url)
-           (push "research" suggestions)
-           (push "academic" suggestions))
-          ((string-match-p "tool\\|utility\\|app\\|service" url)
-           (push "tool" suggestions)
-           (push "utility" suggestions)))
-    
-    ;; Title-based suggestions
-    (when (string-match-p "tutorial\\|guide\\|how-to\\|learn" (downcase title))
-      (push "tutorial" suggestions))
-    (when (string-match-p "book\\|article\\|blog\\|post" (downcase title))
-      (push "reading" suggestions))
-    (when (string-match-p "ai\\|ml\\|machine learning\\|artificial intelligence" (downcase title))
-      (push "ai-ml" suggestions))
-    
-    (reverse (delete-dups suggestions))))
-
-;; Bookmark statistics with detailed breakdown
-(defun my/bookmarks-statistics ()
-  "Show detailed bookmark statistics."
-  (interactive)
-  (with-temp-buffer
-    (insert-file-contents "~/org/bookmarks.org")
-    (goto-char (point-min))
-    (let* ((total-bookmarks (count-matches "^*.*:bookmark:"))
-           (categories (count-matches "^* "))
-           (tags-section (count-matches "^#\\+filetags:"))
-           (last-capture (when (re-search-forward "Captured: \\([0-9-]+\\)" nil t)
-                          (match-string 1)))
-           (today-bookmarks (count-matches (format-time-string "%Y-%m-%d"))))
-      (message "📊 Bookmark Statistics:\n• Total: %d\n• Categories: %d\n• Today: %d\n• Tags configured: %s\n• Last capture: %s"
-               total-bookmarks 
-               categories
-               today-bookmarks
-               (if (> tags-section 0) "Yes" "No")
-               (or last-capture "Unknown")))))
-
-;; Advanced bookmark management
-(defun my/bookmarks-organize ()
-  "Organize bookmarks by moving duplicates and cleaning up structure."
-  (interactive)
-  (with-current-buffer (find-file "~/org/bookmarks.org")
-    (goto-char (point-min))
-    (while (re-search-forward "^\\* \\(.*\\) :bookmark:" nil t)
-      (let ((headline (match-string 1)))
-        (when (> (length headline) 80)
-          (message "Long headline detected: %s" headline))))
-    (message "Organization check complete")))
-
-;; Export functions
-(defun my/bookmarks-export-json (filename)
-  "Export bookmarks to JSON format."
-  (interactive (list (read-file-name "Export to: " "~/org/" "bookmarks.json")))
-  (with-temp-buffer
-    (insert-file-contents "~/org/bookmarks.org")
-    (goto-char (point-min))
-    (let ((bookmarks '()))
-      (while (re-search-forward "^* \\(.+?\\) :bookmark:" nil t)
-        (let* ((headline (match-string 1))
-               (url (when (re-search-forward "- URL: \\(.*\\)" (line-end-position) t)
-                      (match-string 1)))
-               (description (when (re-search-forward "- Description: \\(.*\\)" (line-end-position) t)
-                             (match-string 1))))
-          (when url
-            (push (list :title headline :url url :description description) bookmarks))))
-      (write-region (json-encode bookmarks) nil filename)
-      (message "Exported %d bookmarks to %s" (length bookmarks) filename))))
-
-;; Keybindings for bookmark system
-(map! :leader
-      :prefix ("v" . "workflow")
-      :desc "Bookmark search"         "s" #'my/bookmarks-search
-      :desc "Bookmark quick capture"  "b" #'my/bookmarks-capture-quick
-      :desc "Bookmark rich capture"   "B" #'my/bookmarks-capture-rich
-      :desc "Bookmark categorized"    "c" #'my/bookmarks-capture-categorized
-      :desc "Browse bookmark"         "u" #'my/bookmarks-browse-at-point
-      :desc "Bookmark stats"          "S" #'my/bookmarks-statistics
-      :desc "Bookmark organize"       "O" #'my/bookmarks-organize)
-#+end_src
-
-** Browser Integration
-#+begin_src elisp
-;; Browser Integration for One-Click Bookmarking
-;; This allows bookmark capture directly from the browser
-
-(defun my/bookmarks-capture-from-browser (url title description)
-  "Capture a bookmark from browser with URL, TITLE, and DESCRIPTION."
-  (interactive (list (read-string "URL: " (or (getenv "BOOKMARK_URL") ""))
-                    (read-string "Title: " (or (getenv "BOOKMARK_TITLE") ""))
-                    (read-string "Description: " (or (getenv "BOOKMARK_DESC") ""))))
-  
-  (let* ((org-capture-mode-hook nil)
-         (target-file "~/org/bookmarks.org")
-         (template "* %s :bookmark:\n  %s\n  - URL: %s\n  - Description: %s\n  - Tags: %s\n  - Captured: %U\n\n")
-         (entry (format template title description url description "")))
-    (with-current-buffer (find-file target-file)
-      (goto-char (point-max))
-      (when (not (bolp)) (insert "\n"))
-      (insert entry)
-      (save-buffer))
-    (message "Bookmark captured: %s" title)))
-
-;; Browser capture function for use with external tools
-(defun my/bookmarks-capture-external ()
-  "External bookmark capture function.
-Reads URL, title from environment variables or interactive input."
-  (let ((url (or (getenv "BOOKMARK_URL") 
-                (read-string "URL: ")))
-        (title (or (getenv "BOOKMARK_TITLE")
-                  (read-string "Title: ")))
-        (description (or (getenv "BOOKMARK_DESC")
-                        (read-string "Description: "))))
-    (my/bookmarks-capture-from-browser url title description)))
-
-;; Helper to open bookmarks file quickly
-(defun my/bookmarks-open ()
-  "Open the bookmarks file."
-  (interactive)
-  (find-file "~/org/bookmarks.org"))
-
-;; Add to leader keybindings
-(map! :leader
-      :prefix ("v" . "workflow")
-      :desc "Open bookmarks"      "o" #'my/bookmarks-open)
-#+end_src
-
-** Enhanced Capture Templates
-#+begin_src elisp
-;; Bookmark capture templates for different workflows
-(add-to-list 'org-capture-templates
-             '("bq" "Bookmark Quick" entry
-               (file+head "~/org/bookmarks.org" "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n")
-               "* %(my/bookmarks-suggest-title) :bookmark:\n  - URL: %c\n  - Title: \n  - Description: %(my/bookmarks-suggest-description)\n  - Category: %(my/bookmarks-suggest-category)\n  - Tags: %(my/bookmarks-suggest-tags-function)\n  - Captured: %U\n" :empty-lines 1))
-
-(add-to-list 'org-capture-templates
-             '("br" "Bookmark Rich" entry
-               (file+head "~/org/bookmarks.org" "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n")
-               "* %(my/bookmarks-suggest-title) :bookmark:\n  %(or (my/bookmarks-get-current-url) \"%c\")\n  - URL: %(my/bookmarks-get-current-url)\n  - Title: %(my/bookmarks-suggest-title)\n  - Description: \n  - Summary: \n  - Keywords: \n  - Category: %(my/bookmarks-suggest-category)\n  - Tags: %(my/bookmarks-suggest-tags-function)\n  - Priority: %^{priority|Normal|High|Low}\n  - Status: %^{status|To Review|Useful|Archive}\n  - Captured: %U\n  - Accessed: %u\n  - Notes: %?\n" :empty-lines 1))
-
-(add-to-list 'org-capture-templates
-             '("bc" "Bookmark Categorized" entry
-               (file+head "~/org/bookmarks.org" "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n")
-               "* %(my/bookmarks-suggest-title) :bookmark:\n  - URL: %c\n  - Title: %(my/bookmarks-suggest-title)\n  - Description: %(my/bookmarks-suggest-description)\n  - Category: %(my/bookmarks-suggest-category)\n  - Tags: %(my/bookmarks-suggest-tags-function)\n  - Captured: %U\n" :empty-lines 1))
-
-;; Helper functions for capture templates
-(defun my/bookmarks-get-current-url ()
-  "Get current URL or from environment."
-  (or (getenv "BOOKMARK_URL") 
-      (thing-at-point-url-at-point)
-      "%c"))
-
-(defun my/bookmarks-suggest-title ()
-  "Suggest title from current context."
-  (or (getenv "BOOKMARK_TITLE")
-      (when (bound-and-true-p browse-url-browser-function)
-        (read-string "Title: " (url-get-title-at-url (my/bookmarks-get-current-url))))
-      "Bookmark Title"))
-
-(defun my/bookmarks-suggest-description ()
-  "Suggest description from current context."
-  (or (getenv "BOOKMARK_DESC")
-      ""))
-
-(defun my/bookmarks-suggest-category ()
-  "Suggest category based on URL patterns."
-  (let ((url (my/bookmarks-get-current-url)))
-    (cond ((string-match-p "github\\.com\\|gitlab\\.com\\|stackoverflow" url)
-           "Development")
-          ((string-match-p "arxiv\\|research\\|paper" url)
-           "Learning & Documentation")
-          ((string-match-p "medium\\|dev\\.to\\|blog" url)
-           "Reading List")
-          ((string-match-p "tool\\|app\\|service" url)
-           "Tech Stack")
-          (t
-           (completing-read "Category: " 
-                          '("Reading List" "Tech Stack" "Learning & Documentation" 
-                            "Development" "Personal Projects" "Archive")))))
-
-(defun my/bookmarks-suggest-tags-function ()
-  "Suggest tags based on current context."
-  (let ((url (my/bookmarks-get-current-url))
-        (title (my/bookmarks-suggest-title)))
-    (mapconcat 'identity (my/bookmarks-suggest-tags url title) " ")))
+(provide 'config)
+;;; config.el ends here
 #+end_src

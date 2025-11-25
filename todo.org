@@ -1,0 +1,4 @@
+* Inbox
+** TODO Website content moderation policy @STN
+
+[[file:~/.config/doom/config.org::*Quick Capture][Quick Capture]]
