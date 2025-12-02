@@ -1,0 +1,195 @@
+#+title: Org Mode Readme
+#+title: Doom Emacs Org-Mode Configuration
+#+author: Your Name
+#+filetags: :doom:emacs:org:config:readme:
+
+* Overview
+
+This document outlines the custom Org-Mode configuration for Doom Emacs, designed to create a powerful yet simple system for managing tasks, projects, knowledge, bookmarks, and agendas.
+
+The philosophy is to keep everything Doom gives us (pretty bullets, Roam, refile, agenda, etc.) and add a focused set of templates and workflows to enhance productivity.
+
+* System Capabilities
+
+**Core Components:**
+- **Org-Agenda**: Time-based task and project management.
+- **Org-Roam**: A Zettelkasten-style networked note-taking system.
+- **Org-Capture**: Quick templates for capturing structured information.
+- **Org-Refile**: Moving notes and tasks to their proper homes.
+
+**File Structure:**
+- =~/org/= : Root directory for all Org files.
+- =~/org/inbox.org= : Default location for new tasks and unprocessed notes.
+- =~/org/bookmarks.org= : A dedicated file for captured web links.
+- =~/org/projects.org= : A high-level file for tracking active and completed projects.
+- =~/org/notes/= : The directory for all Org-Roam knowledge notes.
+
+**Key Features:**
+1. **Smart Bookmark Capture**: Instantly saves a URL, title, selection, and timestamp.
+2. **Two-Pane Daily Review**: Puts today's agenda and your inbox side-by-side.
+3. **Structured Project & Task Templates**: Ensures consistency in how you track work.
+4. **Specialized Org-Roam Templates**: Separate workflows for default notes, projects, and references.
+5. **Unified Keybindings**: All commands are logically grouped under the =SPC n= prefix.
+
+* Keybindings
+
+All Org-Mode commands are grouped under the =SPC n= (notes/workflow) prefix for discoverability.
+
+| Key | Command | Description |
+|-----+---------+-------------|
+| =SPC n a= | =org-agenda= | Open the Org agenda. |
+| =SPC n c= | =org-capture= | Open the capture template menu. |
+| =SPC n b= | Capture Bookmark | Directly invoke the bookmark capture template. |
+| =SPC n t= | Capture Task | Directly invoke the task capture template. |
+| =SPC n p= | Capture Project | Directly invoke the project capture template. |
+| =SPC n i= | Open Inbox | Open =~/org/inbox.org=. |
+| =SPC n B= | Open Bookmarks | Open =~/org/bookmarks.org=. |
+| =SPC n P= | Open Projects | Open =~/org/projects.org=. |
+| =SPC n d= | Daily Review | Show today's agenda and inbox side-by-side. |
+| =SPC n w= | Weekly Review | Show a 7-day agenda and all tasks. |
+| =SPC n f= | =org-roam-node-find= | Find and open an existing Org-Roam note. |
+| =SPC n r= | =org-roam-capture= | Open the Org-Roam capture template menu. |
+| =SPC n rt= | Find by Tag (Task) | Find all Roam notes tagged with =task=. |
+| =SPC n rp= | Find by Tag (Project) | Find all Roam notes tagged with =project=. |
+| =SPC n rr= | Find by Tag (Reference) | Find all Roam notes tagged with =reference=. |
+| =SPC n q= | Quick Add to Inbox | Add a single line to inbox without a full capture buffer. |
+
+* Capture Templates
+
+Capture templates are the heart of the workflow, allowing you to quickly and consistently add information to your system.
+
+**Standard Org-Capture Templates:**
+- =b= :: Bookmark: Captures a URL, title, and timestamp into =bookmarks.org=.
+- =t= :: Task: Captures a TODO item with a scheduling prompt into =inbox.org=.
+- =p= :: Project: Creates a structured project entry in =projects.org=.
+
+**Org-Roam Capture Templates:**
+- =d= :: Default: A flexible, general-purpose note.
+- =p= :: Project: A note with a project-specific structure.
+- =r= :: Reference: A note structured for capturing sources and citations.
+
+**Quick Capture:**
+- =q= :: Quick Add: A minimal, fast way to add a single line to your inbox.
+
+* Workflow Examples
+
+**Capturing a Bookmark:**
+1. Copy a URL from your browser.
+2. Press =SPC n c b=.
+3. The template will automatically try to fill the URL and title.
+4. Add any notes and press =C-c C-c= to save.
+
+**Daily Planning:**
+1. Press =SPC n d=.
+2. The left pane shows your agenda for the day.
+3. The right pane shows your inbox for processing new items.
+4. Refile tasks from your inbox to project files or schedule them.
+
+**Starting a New Project:**
+1. Press =SPC n c p=.
+2. Give the project a name.
+3. Fill in the initial goals and high-level tasks.
+4. Press =C-c C-c= to save to your projects file.
+
+* User Stories
+
+Here are the user stories that define the purpose and expected behavior of each capture template and workflow function.
+
+**1. Bookmark Capture (`SPC n c b`)**
+*As a researcher, I want to quickly capture web bookmarks with automatic URL and title extraction so that I can build a searchable knowledge base without manual data entry.*
+- When I trigger `SPC n c b`, the system should automatically detect the URL and title from my clipboard or active browser window.
+- The bookmark should be saved to `~/org/bookmarks.org` under the "Inbox" heading.
+- Each bookmark should include a timestamp and `:bookmark:` tag.
+- I should be able to add additional notes or tags before saving.
+- The capture should complete immediately after adding my notes.
+
+**2. Task Capture (`SPC n c t`)**
+*As a professional, I want to quickly capture tasks with scheduling options so that I can track my commitments and ensure nothing falls through the cracks.*
+- When I trigger `SPC n c t`, I should be prompted for a task description.
+- I should be able to schedule the task for a specific date/time.
+- The task should be saved to `~/org/inbox.org` under the "Tasks" heading.
+- Each task should include a creation timestamp and be marked as TODO.
+- I should be able to add additional context or notes about the task.
+
+**3. Project Capture (`SPC n c p`)**
+*As a project manager, I want to create structured project templates so that I can consistently track goals, tasks, notes, and resources for each initiative.*
+- When I trigger `SPC n c p`, I should be prompted for a project name.
+- The system should create a structured project entry with predefined sections.
+- The project should be saved to `~/org/projects.org` under "Active Projects".
+- Each project should include a creation timestamp.
+- The template should include sections for goals, tasks, notes, and resources.
+- I should remain in the capture buffer to add initial content.
+
+**4. Default Org-Roam Capture (`SPC n r d`)**
+*As a knowledge worker, I want to create flexible notes with automatic tagging so that I can build a connected web of knowledge that's easy to navigate and search.*
+- When I trigger `SPC n r d`, I should be prompted for a note title.
+- The system should generate a unique filename with timestamp and slug.
+- The note should be created in `~/org/notes/` with a title and tags.
+- I should be able to add tags during capture.
+- The note should remain open for editing after capture.
+
+**5. Project Org-Roam Capture (`SPC n r p`)**
+*As a project lead, I want to create dedicated project notes with predefined structure so that I can maintain comprehensive documentation for each initiative.*
+- When I trigger `SPC n r p`, I should be prompted for a project note title.
+- The system should create a project-specific note with `project-` prefix.
+- The note should include predefined sections for goals, tasks, and notes.
+- The note should be tagged with `:project:`.
+- The filename should include a timestamp and slug for uniqueness.
+
+**6. Reference Org-Roam Capture (`SPC n r r`)**
+*As a researcher, I want to create structured reference notes so that I can properly cite and organize sources for my work.*
+- When I trigger `SPC n r r`, I should be prompted for a reference title.
+- The system should create a reference note with `ref-` prefix.
+- The note should include sections for source information and notes.
+- The note should be tagged with `:reference:`.
+- The filename should include a timestamp and slug for uniqueness.
+
+**7. Quick Add to Inbox (`SPC n q`)**
+*As a busy professional, I want to quickly add items to my inbox without navigating menus so that I can capture thoughts immediately without disrupting my workflow.*
+- When I trigger `SPC n q`, I should be prompted for a single line of text.
+- The system should add the text to `~/org/inbox.org` with a timestamp.
+- The entry should be added without opening the capture buffer.
+- The process should be as fast as possible to minimize interruption.
+
+**8. Daily Review (`SPC n d`)**
+*As a productivity enthusiast, I want to view my daily agenda and inbox side-by-side so that I can efficiently plan my day and process new items.*
+- When I trigger `SPC n d`, the system should display today's agenda in the left pane.
+- The right pane should show my inbox file.
+- The windows should be split evenly.
+- All other windows should be closed to minimize distractions.
+
+**9. Weekly Review (`SPC n w`)**
+*As a planner, I want to review my week's agenda and all tasks so that I can reflect on progress and plan ahead effectively.*
+- When I trigger `SPC n w`, the system should display a 7-day agenda starting Monday.
+- All tasks should be listed below the agenda.
+- The view should help me identify what was accomplished and what needs attention.
+
+**10. Project Review (`SPC n P`)**
+*As a project manager, I want to review all active projects so that I can assess progress and identify areas needing attention.*
+- When I trigger `SPC n P`, the system should open my projects file.
+- The view should show project titles with two levels of detail expanded.
+- The overview should help me quickly scan all projects and their key sections.
+
+**11. Find Notes by Tag (`SPC n rt/rp/rr`)**
+*As a knowledge worker, I want to quickly find notes by specific tags so that I can access relevant information without searching through all files.*
+- When I trigger `SPC n rt`, I should be prompted for a tag and see all notes with that tag.
+- When I trigger `SPC n rp`, I should see all project-related notes.
+- When I trigger `SPC n rr`, I should see all reference notes.
+- The results should be filtered and presented quickly.
+
+* Customization
+
+This configuration is designed to be a solid foundation. You can easily:
+- Add new capture templates to =org-capture-templates=.
+- Create custom agenda views in =org-agenda-custom-commands=.
+- Modify keybindings in the =general-def= block.
+- Extend the file structure to suit your needs (e.g., adding a =work.org= file).
+
+* Dependencies
+
+This configuration relies on the following Doom modules:
+- =:lang org= (with =+roam2= flag enabled)
+- =:tools evil= (for keybinding states)
+- =:editor evil= (for general-def integration)
+
+Ensure these are enabled in your =init.el=.

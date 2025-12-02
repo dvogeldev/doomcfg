@@ -1,0 +1,381 @@
+
+
+# David Vogemizations are included, preserving Doom's excellent defaults
+- **Performance**: Optimized for fast startup and responsive operation
+- **Productivity**: Streamlined workflows for task management, note-taking, and bookmarking
+- **Aesthetics**: Clean, distraction-free interface with thoughtful UI choices
+
+The configuration is organized into logical sections, making it easy to understand and customize further.
+
+## Features
+
+- Clean, minimal interface with no tabs
+- Efficient window management with Zoom (flexible golden-ratio alternative)
+- Enhanced Org mode setup with custom capture templates
+- Streamlined bookmark capture with automatic URL/title extraction
+- Custom agenda views for daily and weekly reviews
+- Optimized completion system with Vertico, Orderless, and Consult
+- Integration with Org-roam for note-taking
+- SSH agent via GPG for secure authentication
+- Performance optimizations for faster startup and operation
+
+## Installation
+
+1. Install [Doom Emacs](https://github.com/hlissner/doom-emacs) following the official instructions
+
+2. Clone this configuration to your Doom Emacs config directory:
+
+```bash
+git clone https://github.com/yourusername/doom-emacs-config ~/.config/doom
+```
+
+3. Install required packages:
+
+```bash
+doom sync
+```
+
+4. Restart Emacs and enjoy!
+
+## Configuration Details
+
+### Identity
+
+```elisp
+(setq user-full-name "David Vogel"
+      user-mail-address "dvogelca@proton.me")
+```
+
+Basic user information for commit messages and other contexts.
+
+### Fonts
+
+```elisp
+(setq doom-font (font-spec :family "Hasklug Nerd Font Mono" :size 16 :weight 'semi-light)
+      doom-variable-pitch-font (font-spec :family "Alegreya" :size 18)
+      doom-big-font (font-spec :family "Hasklug Nerd Font Mono" :size 22))
+```
+
+- Primary font: Hasklug Nerd Font Mono (semi-light, 16pt)
+- Variable pitch font: Alegreya (18pt) for proportional text
+- Big font: Hasklug Nerd Font Mono (22pt) for presentations
+
+### Theme & UI
+
+```elisp
+(setq doom-theme 'modus-vivendi-tinted)
+(add-to-list 'default-frame-alist '(undecorated . t))
+(set-frame-parameter (selected-frame) 'alpha '(96 . 97))
+(add-to-list 'default-frame-alist '(alpha . (96 . 97)))
+
+(setq doom-modeline-icon t
+      doom-modeline-major-mode-icon t
+      doom-modeline-lsp t
+      doom-modeline-major-mode-color-icon t)
+```
+
+- Theme: Modus Vivendi Tinted (dark theme with good contrast)
+- Undecorated frames for a cleaner look
+- Slight transparency (96% active, 97% inactive)
+- Rich modeline with icons and LSP information
+
+### Window Management
+
+```elisp
+(use-package! zoom
+  :after evil
+  :config
+  (zoom-mode 1)
+  (setq zoom-size '(60 . nil)
+        zoom-minibuffer-window nil)
+  (add-to-list 'zoom-ignore-modes 'ediff-mode))
+```
+
+Zoom provides a flexible golden-ratio alternative:
+- Active window occupies 60% of frame width
+- Minimum width of 100 columns
+- Excludes minibuffer from zooming
+- Special handling for ediff mode
+
+### General Behavior
+
+```elisp
+(setq display-line-numbers-type 'relative
+      which-key-idle-delay 0.2
+      delete-by-moving-to-trash t
+      auto-save-default t
+      browse-url-browser-function 'browse-url-generic
+      browse-url-generic-program "zen-browser")
+```
+
+- Relative line numbers for better navigation
+- Faster which-key popup (0.2s delay)
+- Move deleted files to trash instead of permanent deletion
+- Auto-save enabled
+- Zen-browser as default web browser
+
+### Performance & Startup
+
+```elisp
+(setq gc-cons-threshold (* 256 1024 1024)
+      gc-cons-percentage 0.1
+      read-process-output-max (* 4 1024 1024)
+      native-comp-async-jobs 4
+      comp-deferred-compilation t
+      vc-handled-backends '(Git))
+```
+
+Performance optimizations:
+- Increased GC threshold to reduce pauses
+- Higher process output buffer for faster LSP
+- Native compilation with 4 parallel jobs
+- Deferred compilation to avoid blocking
+- Git-only version control for faster operations
+
+### Completion System
+
+```elisp
+(after! vertico
+  (setq vertico-count 17 vertico-resize t vertico-cycle t))
+
+(after! orderless
+  (setq completion-styles '(orderless basic)
+        completion-category-overrides '((file (styles basic partial-completion orderless)))))
+
+(after! consult
+  (setq consult-preview-key "M-." consult-narrow-key "<"))
+
+(after! marginalia
+  (setq marginalia-align 'right))
+```
+
+Enhanced completion with:
+- Vertico: 17 candidates, resizing, and cycling
+- Orderless completion with basic fallback
+- File-specific completion styles
+- Consult preview on M-.
+- Right-aligned marginalia annotations
+
+### Org Mode Improvements
+
+```elisp
+(setq org-directory "~/org/"
+      org-agenda-files '("~/org/")
+      org-default-notes-file "~/org/inbox.org"
+      org-roam-directory "~/org/notes")
+```
+
+#### Enhanced Bookmark Capture
+
+```elisp
+(setq org-capture-templates
+      '(("b" "Bookmark" entry
+         (file+headline "~/org/bookmarks.org" "Inbox")
+         (function my/bookmark-template)
+         :empty-lines 1
+         :immediate-finish t)
+        ("t" "Task" entry
+         (file+headline "~/org/inbox.org" "Tasks")
+         "* TODO %^{Task}\nSCHEDULED: %^t\n:PROPERTIES:\n:CREATED: %U\n:END:\n%?"
+         :empty-lines 1)
+        ("p" "Project" entry
+         (file+headline "~/org/projects.org" "Active Projects")
+         "* %^{Project Name}\n:PROPERTIES:\n:CREATED: %U\n:END:\n** Goals\n%?\n** Tasks\n** Notes\n** Resources\n"
+         :empty-lines 1
+         :immediate-finish nil)))
+
+(defun my/bookmark-template ()
+  "Return bookmark capture template with automatic URL/title extraction."
+  (let ((url (org-web-tools--get-first-url))
+        (title (org-web-tools--get-title)))
+    (if (and url title)
+        (format "* [[%s][%s]]   :bookmark:\n:PROPERTIES:\n:CREATED: %U\n:END:\n%?\n%i\n" url title)
+      "* [[%^{URL}][%^{Title}]]   :bookmark:\n:PROPERTIES:\n:CREATED: %U\n:END:\n%?\n%i\n")))
+```
+
+The bookmark template automatically extracts URL and title from the clipboard or current buffer.
+
+#### Enhanced Org-roam Capture Templates
+
+```elisp
+(setq org-roam-capture-templates
+      '(("d" "default" plain "%?"
+         :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n#+filetags: :%^G\n\n")
+         :unnarrowed t)
+        ("p" "project" plain "%?"
+         :target (file+head "project-%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n#+filetags: :project:\n\n* Goals\n\n* Tasks\n\n* Notes\n\n")
+         :unnarrowed t)
+        ("r" "reference" plain "%?"
+         :target (file+head "ref-%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n#+filetags: :reference:\n\n* Source\n\n* Notes\n\n")
+         :unnarrowed t)))
+```
+
+Custom templates for different types of notes in Org-roam.
+
+#### Custom Agenda Views
+
+```elisp
+(setq org-agenda-custom-commands
+      '(("d" "Daily agenda and all TODOs"
+         ((agenda "" ((org-agenda-span 1)))
+          (alltodo "" ((org-agenda-overriding-header "All Tasks")))))
+        ("p" "Project tasks"
+         ((todo "PROJECT" ((org-agenda-overriding-header "Active Projects")))
+          (todo "NEXT" ((org-agenda-overriding-header "Next Actions")))))
+        ("w" "Weekly review"
+         ((agenda "" ((org-agenda-span 7) (org-agenda-start-on-weekday 1)))
+          (alltodo "" ((org-agenda-overriding-header "All Tasks")))))))
+```
+
+Specialized views for daily planning, project management, and weekly reviews.
+
+#### Helper Functions
+
+```elisp
+(defun my/daily-review ()
+  "Today's agenda + inbox side-by-side."
+  (interactive)
+  (org-agenda nil "d")
+  (delete-other-windows)
+  (split-window-right)
+  (find-file org-default-notes-file))
+
+(defun my/project-review ()
+  "Review active projects."
+  (interactive)
+  (find-file "~/org/projects.org")
+  (org-overview)
+  (org-show-children 2))
+
+(defun my/roam-find-by-tag (tag)
+  "Find org-roam notes with specific tag."
+  (interactive "sTag: ")
+  (org-roam-db-find-file-by-tag tag))
+
+(defun my/refile-bookmarks ()
+  "Refile bookmarks to appropriate categories based on tags."
+  (interactive)
+  (org-map-entries
+   (lambda ()
+     (let ((tags (org-get-tags)))
+       (cond
+        ((member "work" tags) (org-refile 3 nil (list "Work" "~/org/bookmarks.org" nil nil)))
+        ((member "personal" tags) (org-refile 3 nil (list "Personal" "~/org/bookmarks.org" nil nil)))
+        ((member "reference" tags) (org-refile 3 nil (list "Reference" "~/org/bookmarks.org" nil nil)))
+        (t nil))))
+   "+bookmark" "~/org/bookmarks.org"))
+
+(defun my/quick-add-to-inbox ()
+  "Quickly add a task or note to inbox without full capture interface."
+  (interactive)
+  (let ((content (read-string "Add to inbox: ")))
+    (with-current-buffer (find-file-noselect org-default-notes-file)
+      (goto-char (point-max))
+      (insert (format "\n* %s\n:PROPERTIES:\n:CREATED: %U\n:END:\n" content))
+      (save-buffer))))
+```
+
+Utility functions for common workflows:
+- Daily review with agenda and inbox side-by-side
+- Project review with organized view
+- Finding notes by tag in Org-roam
+- Refiling bookmarks based on tags
+- Quick addition to inbox without full capture interface
+
+### Keybindings
+
+```elisp
+(after! evil
+  (general-def
+    :states 'normal
+    :keymaps 'override
+    :prefix "SPC n"
+    "" 'which-key-show-major-mode
+    "a" '(org-agenda :wk "Org agenda")
+    "c" '(org-capture :wk "Org capture")
+    "b" '(lambda () (interactive) (org-capture nil "b") :wk "Capture bookmark")
+    "t" '(lambda () (interactive) (org-capture nil "t") :wk "Capture task")
+    "p" '(lambda () (interactive) (org-capture nil "p") :wk "Capture project")
+    "i" '(lambda () (interactive) (find-file org-default-notes-file) :wk "Open inbox")
+    "B" '(lambda () (interactive) (find-file "~/org/bookmarks.org") :wk "Open bookmarks")
+    "P" '(lambda () (interactive) (find-file "~/org/projects.org") :wk "Open projects")
+    "d" '(my/daily-review :wk "Daily review")
+    "w" '(lambda () (interactive) (org-agenda nil "w") :wk "Weekly review")
+    "f" '(org-roam-node-find :wk "Roam find")
+    "r" '(org-roam-capture :wk "Roam capture")
+    "rt" '(lambda () (interactive) (my/roam-find-by-tag "task") :wk "Find task notes")
+    "rp" '(lambda () (interactive) (my/roam-find-by-tag "project") :wk "Find project notes")
+    "rr" '(lambda () (interactive) (my/roam-find-by-tag "reference") :wk "Find reference notes")
+    "q" '(my/quick-add-to-inbox :wk "Quick add to inbox"))
+  (general-unbind
+    :keymaps 'leader-minor-mode-keymap
+    "n r"))
+```
+
+All Org-related functionality is organized under the `SPC n` prefix:
+- `a`: Open agenda
+- `c`: Open capture
+- `b`: Capture bookmark
+- `t`: Capture task
+- `p`: Capture project
+- `i`: Open inbox
+- `B`: Open bookmarks
+- `P`: Open projects
+- `d`: Daily review
+- `w`: Weekly review
+- `f`: Find roam note
+- `r`: Capture roam note
+- `rt/rp/rr`: Find roam notes by tag
+- `q`: Quick add to inbox
+
+### System Integration
+
+#### SSH Agent via GPG
+
+```elisp
+(setenv "SSH_AUTH_SOCK"
+        (concat (or (getenv "XDG_RUNTIME_DIR")
+                    (format "/run/user/%d" (user-uid)))
+                "/gnupg/S.gpg-agent.ssh"))
+```
+
+Sets up SSH authentication through GPG agent for secure key management.
+
+## File Structure
+
+```
+~/.config/doom/
+├── config.el              # Main configuration file
+├── init.el                # Enabled modules
+├── packages.el            # Additional packages
+└── themes/                # Custom themes (if any)
+
+~/org/
+├── inbox.org              # Default notes file
+├── bookmarks.org          # Web bookmarks
+├── projects.org           # Project tracking
+└── notes/                 # Org-roam directory
+    ├── project-*.org      # Project notes
+    ├── ref-*.org          # Reference materials
+    └── *.org              # General notes
+```
+
+## Contributing
+
+Feel free to submit issues and enhancement requests! If you have a configuration that improves this setup:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## License
+
+This configuration is released under the MIT License. See the LICENSE file for details.
+
+---
+
+*Built with ❤️ and Doom Emacs*

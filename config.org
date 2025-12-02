@@ -1,27 +1,12 @@
 #+title: David Vogel's Clean Doom Emacs Config
 #+author: David Vogel
-#+date: <2025-11-25>
+#+date: <2025-11-29>
 #+description: Minimal, fast, beautiful — built on Doom’s excellent defaults + one perfect bookmark template
 #+property: header-args:elisp :tangle config.el :mkdirp yes
 #+startup: overview
 
 * Introduction
-* Table of Contents                                             :toc:
-- [[#introduction][Introduction]]
-- [[#identity][Identity]]
-- [[#fonts][Fonts]]
-- [[#theme--ui][Theme & UI]]
-- [[#general-behavior][General Behavior]]
-- [[#performance--startup][Performance & Startup]]
-- [[#completion-tweaks][Completion Tweaks]]
-- [[#in-buffer-completion-company][In-Buffer Completion (Company)]]
-- [[#org-mode--dooms-defaults--bookmark-capture][Org Mode — Doom’s defaults + bookmark capture]]
-  - [[#daily-review--still-the-best-two-pane-workflow][Daily Review — still the best two-pane workflow]]
-- [[#keybindings][Keybindings]]
-  - [[#fixed-safer-binding-to-avoid-prefix-conflicts][FIXED: Safer binding to avoid prefix conflicts]]
-- [[#system-integration][System Integration]]
-  - [[#ssh-agent-via-gpg][SSH Agent via GPG]]
-  - [[#final-touch][Final touch]]
+This is a literate Doom Emacs config focused on org-roam, capture, and distraction-free workflow.
 
 * Identity
 #+begin_src elisp
@@ -39,6 +24,8 @@
 * Theme & UI
 #+begin_src elisp
 (setq doom-theme 'modus-vivendi-tinted)
+(load-theme 'modus-vivendi-tinted t)
+
 (add-to-list 'default-frame-alist '(undecorated . t))
 (set-frame-parameter (selected-frame) 'alpha '(96 . 97))
 (add-to-list 'default-frame-alist '(alpha . (96 . 97)))
@@ -47,14 +34,33 @@
       doom-modeline-major-mode-icon t
       doom-modeline-lsp t
       doom-modeline-major-mode-color-icon t)
+#+end_src
 
-(use-package! golden-ratio
-     :defer t
-     :config
-     (golden-ratio-mode 1)
-     (set golden-ratio-adjust-factor 1.05 ))
-(map! :leader
-      :desc "Toggle golden-ratio" "t G" #'golden-ratio-mode)
+** Window Management: Zoom (flexible golden-ratio alternative)
+#+begin_src elisp
+(use-package! zoom
+  :after evil
+  :config
+  (zoom-mode 1)
+  (setq zoom-size '(60 . nil)
+        zoom-minibuffer-window nil)
+  ;; Ensure the variable exists before modifying it
+  (defvar zoom-ignore-modes)
+  (add-to-list 'zoom-ignore-modes 'ediff-mode))
+#+end_src
+
+* Remove tabs completely
+#+begin_src elisp
+(setq tab-bar-mode nil
+      doom-tab-bar-mode nil)
+(after! centaur-tabs
+  (centaur-tabs-mode -1)
+  (setq centaur-tabs-enabled nil))
+(tab-bar-mode -1)
+(tab-line-mode -1)
+(map! :leader "t" nil)
+(map! :leader "t TAB" nil)
+(add-hook 'after-make-frame-functions (lambda (frame) (tab-bar-mode -1)))
 #+end_src
 
 * General Behavior
@@ -81,14 +87,11 @@
 #+begin_src elisp
 (after! vertico
   (setq vertico-count 17 vertico-resize t vertico-cycle t))
-
 (after! orderless
   (setq completion-styles '(orderless basic)
         completion-category-overrides '((file (styles basic partial-completion orderless)))))
-
 (after! consult
   (setq consult-preview-key "M-." consult-narrow-key "<"))
-
 (after! marginalia
   (setq marginalia-align 'right))
 #+end_src
@@ -101,35 +104,155 @@
         company-show-quick-access t))
 #+end_src
 
-* Org Mode — Doom’s defaults + bookmark capture
-We keep everything Doom gives us (pretty bullets, roam, refile, agenda, etc.) and add **one** excellent bookmark template.
+* Org Improved
 
+** Dependencies
+#+begin_src elisp
+(use-package! org-web-tools :ensure t :demand t)
+(require 'url)
+#+end_src
+
+** Paths
 #+begin_src elisp
 (setq org-directory "~/org/"
       org-agenda-files '("~/org/")
       org-default-notes-file "~/org/inbox.org"
       org-roam-directory "~/org/notes")
+#+end_src
 
-;; One perfect bookmark capture template
-;; Use `SPC n c b` → instantly saves URL + title + selection + timestamp
-;; Works from anywhere (browser via bookmarklet, Emacs buffer, etc.)
+** Pre-create Essential Files
+#+begin_src elisp
+(dolist (spec
+         '(("~/org/inbox.org"
+            "#+title: Inbox
+#+filetags: :inbox:
+* Tasks
+* Notes
+")
+           ("~/org/bookmarks.org"
+            "#+title: Web Bookmarks
+#+filetags: :bookmarks:
+* Inbox
+* Work
+* Personal
+* Reference
+")
+           ("~/org/projects.org"
+            "#+title: Projects
+#+filetags: :projects:
+* Active Projects
+* Completed Projects
+")))
+  (let ((file (car spec)) (content (cadr spec)))
+    (unless (file-exists-p file)
+      (make-directory (file-name-directory file) t)
+      (with-temp-file file (insert content)))))
+#+end_src
+
+** Helpers
+
+*** Fetch Page Title
+#+begin_src elisp
+(defun my/fetch-page-title (url)
+  "Fetch page title from URL with fallback."
+  (condition-case nil
+      (with-current-buffer (url-retrieve-synchronously url)
+        (goto-char (point-min))
+        (when (re-search-forward "<title>\\([^<]*\\)</title>" nil t)
+          (string-trim (match-string 1))))
+    (error nil)))
+#+end_src
+
+*** Bookmark Template
+#+begin_src elisp
+(defun my/bookmark-template ()
+  "Return bookmark capture template with auto URL/title."
+  (let* ((url (ignore-errors (org-web-tools--get-first-url)))
+         (title (or (ignore-errors (org-web-tools--get-title))
+                    (and url (my/fetch-page-title url)))))
+    (if (and url title)
+        (format "* [[%s][%s]]   :bookmark:
+:PROPERTIES:
+:CREATED: %%U
+:END:
+%%%%?
+%%%%i
+" url title)
+      "* [[%%^{URL}][%%^{Title}]]   :bookmark:
+:PROPERTIES:
+:CREATED: %%U
+:END:
+%%%%?
+%%%%i
+")))
+#+end_src
+
+** Capture Templates
+#+begin_src elisp
 (setq org-capture-templates
       '(("b" "Bookmark" entry
          (file+headline "~/org/bookmarks.org" "Inbox")
-         "* [[%^{URL}][%^{Title}]]   :bookmark:\n:PROPERTIES:\n:CREATED: %U\n:END:\n%?\n%i\n"
+         (function my/bookmark-template)
          :empty-lines 1
-         :immediate-finish t)))
-
-;; Optional: auto-create bookmarks.org if it doesn't exist (safe, idempotent)
-(unless (file-exists-p "~/org/bookmarks.org")
-  (with-temp-file "~/org/bookmarks.org"
-    (insert "#+title: Web Bookmarks\n#+filetags: :bookmarks:\n\n* Inbox\n")))
+         :immediate-finish t)
+        ("t" "Task" entry
+         (file+headline "~/org/inbox.org" "Tasks")
+         "* TODO %^{Task}
+SCHEDULED: %^t
+:PROPERTIES:
+:CREATED: %U
+:END:
+%?"
+         :empty-lines 1)
+        ("p" "Project" entry
+         (file+headline "~/org/projects.org" "Active Projects")
+         "* %^{Project Name}
+:PROPERTIES:
+:CREATED: %U
+:END:
+** Goals
+%?
+** Tasks
+** Notes
+** Resources
+"
+         :empty-lines 1)))
 #+end_src
 
-** Daily Review — still the best two-pane workflow
+** Org-Roam Capture Templates
+#+begin_src elisp
+(setq org-roam-capture-templates
+      '(("d" "default" plain "%?"
+         :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n#+filetags: :%^G\n")
+         :unnarrowed t)
+        ("p" "project" plain "%?"
+         :target (file+head "project-%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n#+filetags: :project:\n* Goals\n* Tasks\n* Notes\n")
+         :unnarrowed t)
+        ("r" "reference" plain "%?"
+         :target (file+head "ref-%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}\n#+filetags: :reference:\n* Source\n* Notes\n")
+         :unnarrowed t)))
+#+end_src
+
+** Agenda Views
+#+begin_src elisp
+(setq org-agenda-custom-commands
+      '(("d" "Daily agenda and all TODOs"
+         ((agenda "" ((org-agenda-span 1)))
+          (alltodo "" ((org-agenda-overriding-header "All Tasks")))))
+        ("w" "Weekly review"
+         ((agenda "" ((org-agenda-span 7) (org-agenda-start-on-weekday 1)))
+          (alltodo "" ((org-agenda-overriding-header "All Tasks")))))))
+#+end_src
+
+** Interactive Functions
+
+*** Daily Review
 #+begin_src elisp
 (defun my/daily-review ()
-  "Today’s agenda + inbox side-by-side."
+  "Today's agenda + inbox side-by-side."
   (interactive)
   (org-agenda nil "d")
   (delete-other-windows)
@@ -137,44 +260,103 @@ We keep everything Doom gives us (pretty bullets, roam, refile, agenda, etc.) an
   (find-file org-default-notes-file))
 #+end_src
 
-* Keybindings
-Everything under =SPC n= (notes/workflow) — clean and discoverable.
-
-** FIXED: Safer binding to avoid prefix conflicts
-We use `general-def` to explicitly unbind/override any conflicting `n r` from Evil defaults, then bind safely.
-
+*** Quick Add to Inbox
 #+begin_src elisp
-(after! evil  ; Wait for Evil to load its defaults
+(defun my/quick-add-to-inbox ()
+  "Quickly add a task to inbox."
+  (interactive)
+  (let ((content (read-string "Add to inbox: ")))
+    (with-current-buffer (find-file-noselect org-default-notes-file)
+      (goto-char (point-max))
+      (insert (format "
+* %s
+:PROPERTIES:
+:CREATED: %U
+:END:
+" content))
+      (save-buffer))))
+#+end_src
+
+*** Roam Find by Tag
+#+begin_src elisp
+(defun my/roam-find-by-tag (tag)
+  "Find org-roam notes by tag."
+  (interactive "sTag: ")
+  (org-roam-db-query [:find (pull ?f [*])
+                      :in $ ?tag
+                      :where [?f :filetags ?tags]
+                      [(string/contains? ?tags ?tag)]]
+                     tag))
+#+end_src
+
+* vTerm
+#+begin_src elisp
+(use-package! vterm
+  :config
+  (setq vterm-shell "/usr/bin/fish"))
+#+end_src
+
+* Keybindings
+All note-taking and workflow commands under =SPC n= — clean, discoverable, and which-key compatible.
+#+begin_src emacs-lisp
+;; Named commands for clean which-key integration
+(defun +capture/bookmark () (interactive) (org-capture nil "b"))
+(defun +capture/task    () (interactive) (org-capture nil "t"))
+(defun +capture/project () (interactive) (org-capture nil "p"))
+
+(defun +find/inbox      () (interactive) (find-file "~/org/inbox.org"))
+(defun +find/bookmarks  () (interactive) (find-file "~/org/bookmarks.org"))
+(defun +find/projects   () (interactive) (find-file "~/org/projects.org"))
+
+(defun +roam/task-notes () (interactive) (my/roam-find-by-tag "task"))
+(defun +roam/project-notes () (interactive) (my/roam-find-by-tag "project"))
+(defun +roam/ref-notes   () (interactive) (my/roam-find-by-tag "reference"))
+
+(after! evil
   (general-def
     :states 'normal
-    :keymaps 'override  ; Override any Doom/Evil defaults
-    :prefix "SPC n"     ; Single-level prefix (no sub-nesting)
-    "" 'which-key-show-major-mode  ; Show help for this prefix
-    "a" '(org-agenda :wk "Org agenda")
-    "c" '(org-capture :wk "Org capture")
-    "b" '(lambda () (interactive) (org-capture nil "b") :wk "Capture bookmark")
-    "i" '(lambda () (interactive) (find-file org-default-notes-file) :wk "Open inbox")
-    "B" '(lambda () (interactive) (find-file "~/org/bookmarks.org") :wk "Open bookmarks")
-    "d" '(my/daily-review :wk "Daily review")
-    "f" '(org-roam-node-find :wk "Roam find")
-    "r" '(org-roam-capture :wk "Roam capture"))  ; ← This overrides any conflicting "n r"
-  ;; Explicitly clear any sub-prefix under "n r" if it exists from Evil
-  (general-unbind
-    :keymaps 'leader-minor-mode-keymap
-    "n r"))
+    :keymaps 'override
+    :prefix "SPC n"
+    ""   'which-key-show-major-mode
+
+    ;; Core
+    "a"  '(org-agenda          :wk "Agenda")
+    "c"  '(org-capture         :wk "Capture")
+
+    ;; Capture
+    "b"  '(+capture/bookmark   :wk "Bookmark")
+    "t"  '(+capture/task       :wk "Task")
+    "p"  '(+capture/project    :wk "Project")
+
+    ;; Files
+    "i"  '(+find/inbox         :wk "Inbox")
+    "B"  '(+find/bookmarks     :wk "Bookmarks")
+    "P"  '(+find/projects      :wk "Projects")
+
+    ;; Reviews
+    "d"  '(my/daily-review     :wk "Daily review")
+    "w"  '(lambda () (interactive) (org-agenda nil "w"))  ; weekly agenda
+
+    ;; Roam
+    "f"  '(org-roam-node-find  :wk "Roam find")
+    "r"  '(org-roam-capture    :wk "Roam capture")
+    "rt" '(+roam/task-notes    :wk "Task notes")
+    "rp" '(+roam/project-notes :wk "Project notes")
+    "rr" '(+roam/ref-notes     :wk "Ref notes")
+
+    ;; Utilities
+    "q"  '(my/quick-add-to-inbox :wk "Quick add"))
+
+  ;; Neutralize Evil's `n r` (paste-pop)
+  (general-unbind :keymaps 'leader-minor-mode-keymap "n r"))
 #+end_src
 
 * System Integration
+
 ** SSH Agent via GPG
 #+begin_src elisp
 (setenv "SSH_AUTH_SOCK"
         (concat (or (getenv "XDG_RUNTIME_DIR")
                     (format "/run/user/%d" (user-uid)))
                 "/gnupg/S.gpg-agent.ssh"))
-#+end_src
-
-** Final touch
-#+begin_src elisp
-(provide 'config)
-;;; config.el ends here
 #+end_src

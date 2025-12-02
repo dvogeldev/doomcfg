@@ -1,0 +1,421 @@
+#+title: David Vogel's Clean Doom Emacs Config
+#+author: David Vogel
+#+date: <2025-11-25>
+#+description: Minimal, fast, beautiful — built on Doom’s excellent defaults + one perfect bookmark template
+#+property: header-args:elisp :tangle config.el :mkdirp yes
+#+startup: overview
+
+* Introduction
+* Table of Contents                                             :toc:
+- [[#introduction][Introduction]]
+- [[#identity][Identity]]
+- [[#fonts][Fonts]]
+- [[#theme--ui][Theme & UI]]
+  - [[#window-management-zoom-flexible-golden-ratio-alternative][Window Management: Zoom (flexible golden-ratio alternative)]]
+- [[#remove-tabs-completely][Remove tabs completely]]
+- [[#general-behavior][General Behavior]]
+- [[#performance--startup][Performance & Startup]]
+- [[#completion-tweaks][Completion Tweaks]]
+- [[#in-buffer-completion-company][In-Buffer Completion (Company)]]
+- [[#org-improved][Org Improved]]
+  - [[#goals][Goals]]
+  - [[#tasks][Tasks]]
+  - [[#notes][Notes]]
+  - [[#resources][Resources]]
+- [[#goals-1][Goals]]
+- [[#tasks-1][Tasks]]
+- [[#notes-1][Notes]]
+- [[#source][Source]]
+- [[#notes-2][Notes]]
+- [[#tasks-2][Tasks]]
+- [[#notes-3][Notes]]
+- [[#inbox][Inbox]]
+- [[#work][Work]]
+- [[#personal][Personal]]
+- [[#reference][Reference]]
+- [[#active-projects][Active Projects]]
+- [[#completed-projects][Completed Projects]]
+- [[#keybindings][Keybindings]]
+- [[#system-integration][System Integration]]
+  - [[#ssh-agent-via-gpg][SSH Agent via GPG]]
+  - [[#final-touch][Final touch]]
+
+* Identity
+#+begin_src elisp
+(setq user-full-name "David Vogel"
+      user-mail-address "dvogelca@proton.me")
+#+end_src
+
+* Fonts
+#+begin_src elisp
+(setq doom-font (font-spec :family "Hasklug Nerd Font Mono" :size 16 :weight 'semi-light)
+      doom-variable-pitch-font (font-spec :family "Alegreya" :size 18)
+      doom-big-font (font-spec :family "Hasklug Nerd Font Mono" :size 22))
+#+end_src
+
+* Theme & UI
+#+begin_src elisp
+(setq doom-theme 'modus-vivendi-tinted)
+(add-to-list 'default-frame-alist '(undecorated . t))
+(set-frame-parameter (selected-frame) 'alpha '(96 . 97))
+(add-to-list 'default-frame-alist '(alpha . (96 . 97)))
+
+(setq doom-modeline-icon t
+      doom-modeline-major-mode-icon t
+      doom-modeline-lsp t
+      doom-modeline-major-mode-color-icon t)
+
+** Window Management: Zoom (flexible golden-ratio alternative)
+#+begin_src elisp
+(use-package! zoom
+  :after evil
+  :config
+  (zoom-mode 1)
+  ;; Exact 60/40 split: Active window at 60% frame width, min 100 cols
+  (setq zoom-size '(60 . nil)  ; (width-percent . height-percent-of-frame)
+        zoom-minibuffer-window nil)  ; Don't zoom minibuffer
+  ;; Optional: Ignore certain modes (e.g., for your daily-review splits)
+  (add-to-list 'zoom-ignore-modes 'ediff-mode)
+  )
+#+end_src
+#+end_src
+* Remove tabs completely
+#+begin_src elisp
+;; Disable Doom's tab-bar (the pretty visual tabs at the top)
+(setq tab-bar-mode nil
+      doom-tab-bar-mode nil)   ; old name, kept for compatibility
+
+;; If you are on Doom ≥ v22.12 that uses centaur-tabs instead:
+(after! centaur-tabs
+  (centaur-tabs-mode -1)
+  (setq centaur-tabs-enabled nil))
+
+;; Completely turn off the built-in Emacs 27+ tab-bar and tab-line
+(tab-bar-mode -1)
+(tab-line-mode -1)
+
+;; Remove any keybindings that toggle tabs (optional but clean)
+(map! :leader "t" nil)        ; removes the whole "toggle" prefix if you want
+;; or just the specific tab toggle:
+(map! :leader "t TAB" nil)
+
+;; Prevent tabs from ever coming back on new frames
+(add-hook 'after-make-frame-functions (lambda (frame) (tab-bar-mode -1)))
+#+end_src
+
+* General Behavior
+#+begin_src elisp
+(setq display-line-numbers-type 'relative
+      which-key-idle-delay 0.2
+      delete-by-moving-to-trash t
+      auto-save-default t
+      browse-url-browser-function 'browse-url-generic
+      browse-url-generic-program "zen-browser")
+#+end_src
+
+* Performance & Startup
+#+begin_src elisp
+(setq gc-cons-threshold (* 256 1024 1024)
+      gc-cons-percentage 0.1
+      read-process-output-max (* 4 1024 1024)
+      native-comp-async-jobs 4
+      comp-deferred-compilation t
+      vc-handled-backends '(Git))
+#+end_src
+
+* Completion Tweaks
+#+begin_src elisp
+(after! vertico
+  (setq vertico-count 17 vertico-resize t vertico-cycle t))
+
+(after! orderless
+  (setq completion-styles '(orderless basic)
+        completion-category-overrides '((file (styles basic partial-completion orderless)))))
+
+(after! consult
+  (setq consult-preview-key "M-." consult-narrow-key "<"))
+
+(after! marginalia
+  (setq marginalia-align 'right))
+#+end_src
+
+* In-Buffer Completion (Company)
+#+begin_src elisp
+(after! company
+  (setq company-idle-delay 0.2
+        company-minimum-prefix-length 2
+        company-show-quick-access t))
+#+end_src
+
+* Org Improved
+#+begin_src emacs-lisp :tangle yes
+;; Ensure org-web-tools is available (for title/URL extraction)
+(use-package! org-web-tools
+  :ensure t
+  :demand t)
+
+;; ── Core Settings ──────────────────────────────────────────────
+(setq org-directory "~/org/"
+      org-agenda-files '("~/org/")
+      org-default-notes-file "~/org/inbox.org"
+      org-roam-directory "~/org/notes")
+
+;; ── Helper: Fetch page title (fallback method) ─────────────────
+(require 'url)
+(defun my/fetch-page-title (url)
+  "Fetch page title from URL using libxml parser (fallback)."
+  (when (require 'url nil :no-error)
+    (condition-case nil
+        (with-current-buffer (url-retrieve-synchronously url)
+          (goto-char (point-min))
+          (re-search-forward "<title>\\(.*?\\)</title>" nil t 2)
+          (and (match-string 1) (string-trim (match-string 1))))
+      (error nil))))
+
+;; ── Bookmark Capture Template ──────────────────────────────────
+(defun my/bookmark-template ()
+  "Return bookmark capture template with automatic URL/title extraction."
+  (let* ((url (ignore-errors (org-web-tools--get-first-url)))
+         (title (or (ignore-errors (org-web-tools--get-title))
+                    (and url (my/fetch-page-title url)))))
+    (if (and url title)
+        (format "* [[%s][%s]]   :bookmark:
+:PROPERTIES:
+:CREATED: %U
+:END:
+%?
+%i
+" url title)
+      "* [[%^{URL}][%^{Title}]]   :bookmark:
+:PROPERTIES:
+:CREATED: %U
+:END:
+%?
+%i
+")))
+
+;; ── Capture Templates ───────────────────────────────────────────
+(setq org-capture-templates
+      '(("b" "Bookmark" entry
+         (file+headline "~/org/bookmarks.org" "Inbox")
+         (function my/bookmark-template)
+         :empty-lines 1
+         :immediate-finish t)
+        ("t" "Task" entry
+         (file+headline "~/org/inbox.org" "Tasks")
+         "* TODO %^{Task}
+SCHEDULED: %^t
+:PROPERTIES:
+:CREATED: %U
+:END:
+%?"
+         :empty-lines 1)
+        ("p" "Project" entry
+         (file+headline "~/org/projects.org" "Active Projects")
+         "* %^{Project Name}
+:PROPERTIES:
+:CREATED: %U
+:END:
+** Goals
+%?
+** Tasks
+** Notes
+** Resources
+"
+         :empty-lines 1)))
+
+;; ── Org-Roam Templates ──────────────────────────────────────────
+(setq org-roam-capture-templates
+      '(("d" "default" plain "%?"
+         :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}
+#+filetags: :%^G
+")
+         :unnarrowed t)
+        ("p" "project" plain "%?"
+         :target (file+head "project-%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}
+#+filetags: :project:
+* Goals
+* Tasks
+* Notes
+")
+         :unnarrowed t)
+        ("r" "reference" plain "%?"
+         :target (file+head "ref-%<%Y%m%d%H%M%S>-${slug}.org"
+                            "#+title: ${title}
+#+filetags: :reference:
+* Source
+* Notes
+")
+         :unnarrowed t)))
+
+;; ── Custom Agenda Views ─────────────────────────────────────────
+(setq org-agenda-custom-commands
+      '(("d" "Daily agenda and all TODOs"
+         ((agenda "" ((org-agenda-span 1)))
+          (alltodo "" ((org-agenda-overriding-header "All Tasks")))))
+        ("p" "Project tasks"
+         ((todo "PROJECT" ((org-agenda-overriding-header "Active Projects")))
+          (todo "NEXT" ((org-agenda-overriding-header "Next Actions")))))
+        ("w" "Weekly review"
+         ((agenda "" ((org-agenda-span 7) (org-agenda-start-on-weekday 1)))
+          (alltodo "" ((org-agenda-overriding-header "All Tasks")))))))
+
+;; ── Workflow Functions ──────────────────────────────────────────
+(defun my/daily-review ()
+  "Today's agenda + inbox side-by-side."
+  (interactive)
+  (org-agenda nil "d")
+  (delete-other-windows)
+  (split-window-right)
+  (find-file org-default-notes-file))
+
+(defun my/project-review ()
+  "Review active projects."
+  (interactive)
+  (find-file "~/org/projects.org")
+  (org-overview)
+  (org-show-children 2))
+
+(defun my/roam-find-by-tag (tag)
+  "Find org-roam notes with specific tag."
+  (interactive "sTag: ")
+  (org-roam-db-query [:find (pull ?f [*])
+                      :in $ ?tag
+                      :where [?f :filetags ?tags]
+                      [?tag (string/contains? ?tags ?tag)]] tag))
+
+(defun my/quick-add-to-inbox ()
+  "Quickly add a task or note to inbox without full capture interface."
+  (interactive)
+  (let ((content (read-string "Add to inbox: ")))
+    (with-current-buffer (find-file-noselect org-default-notes-file)
+      (goto-char (point-max))
+      (insert (format "\n* %s
+:PROPERTIES:
+:CREATED: %U
+:END:\n" content))
+      (save-buffer))))
+
+;; ── Keybindings (SPC n) ─────────────────────────────────────────
+(after! evil
+  (general-def
+    :states 'normal
+    :keymaps 'override
+    :prefix "SPC n"
+    ""   'which-key-show-major-mode
+    "a"  '(org-agenda :wk "Agenda")
+    "c"  '(org-capture :wk "Capture")
+    "b"  '(lambda () (interactive) (org-capture nil "b")) ; Bookmark
+    "t"  '(lambda () (interactive) (org-capture nil "t")) ; Task
+    "p"  '(lambda () (interactive) (org-capture nil "p")) ; Project
+    "i"  '(lambda () (interactive) (find-file org-default-notes-file)) ; Inbox
+    "B"  '(lambda () (interactive) (find-file "~/org/bookmarks.org")) ; Bookmarks
+    "P"  '(lambda () (interactive) (find-file "~/org/projects.org")) ; Projects
+    "d"  '(my/daily-review :wk "Daily review")
+    "w"  '(lambda () (interactive) (org-agenda nil "w")) ; Weekly
+    "f"  '(org-roam-node-find :wk "Roam find")
+    "r"  '(org-roam-capture :wk "Roam capture")
+    "rt" '(lambda () (interactive) (my/roam-find-by-tag "task")) ; Task notes
+    "rp" '(lambda () (interactive) (my/roam-find-by-tag "project")) ; Project notes
+    "rr" '(lambda () (interactive) (my/roam-find-by-tag "reference")) ; Ref notes
+    "q"  '(my/quick-add-to-inbox :wk "Quick add"))
+  ;; Neutralize Evil's `n r` (paste-pop) under leader prefix
+  (general-unbind :keymaps 'leader-minor-mode-keymap "n r"))
+
+;; ── Auto-create Org Files ───────────────────────────────────────
+(dolist (file '("~/org/inbox.org"
+                "~/org/bookmarks.org"
+                "~/org/projects.org"))
+  (unless (file-exists-p file)
+    (with-temp-file file
+      (insert
+       (cond
+        ((string-suffix-p "inbox.org" file)
+         "#+title: Inbox
+#+filetags: :inbox:
+* Tasks
+* Notes
+")
+        ((string-suffix-p "bookmarks.org" file)
+         "#+title: Web Bookmarks
+#+filetags: :bookmarks:
+* Inbox
+* Work
+* Personal
+* Reference
+")
+        ((string-suffix-p "projects.org" file)
+         "#+title: Projects
+#+filetags: :projects:
+* Active Projects
+* Completed Projects
+")
+        (t ""))))))
+#+end_src
+* Keybindings
+All note-taking and workflow commands under =SPC n= — clean, discoverable, and which-key compatible.
+#+begin_src emacs-lisp :tangle yes
+;; Named capture commands for which-key compatibility
+(defun +capture/bookmark () (interactive) (org-capture nil "b"))
+(defun +capture/task    () (interactive) (org-capture nil "t"))
+(defun +capture/project () (interactive) (org-capture nil "p"))
+
+;; Helper aliases for readability
+(defalias '+find/inbox      (lambda () (interactive) (find-file org-default-notes-file)))
+(defalias '+find/bookmarks  (lambda () (interactive) (find-file "~/org/bookmarks.org")))
+(defalias '+find/projects   (lambda () (interactive) (find-file "~/org/projects.org")))
+
+(after! evil
+  (general-def
+    :states 'normal
+    :keymaps 'override
+    :prefix "SPC n"
+    ""   'which-key-show-major-mode
+
+    ;; Core
+    "a"  '(org-agenda            :wk "Agenda")
+    "c"  '(org-capture           :wk "Capture")
+
+    ;; Captures
+    "b"  '(+capture/bookmark     :wk "Bookmark")
+    "t"  '(+capture/task         :wk "Task")
+    "p"  '(+capture/project      :wk "Project")
+
+    ;; File navigation
+    "i"  '(+find/inbox           :wk "Inbox")
+    "B"  '(+find/bookmarks       :wk "Bookmarks")
+    "P"  '(+find/projects        :wk "Projects")
+
+    ;; Reviews
+    "d"  '(my/daily-review       :wk "Daily review")
+    "w"  '(org-agenda           :wk "Weekly review") ; agenda "w" is built-in
+
+    ;; Org-roam
+    "f"  '(org-roam-node-find    :wk "Roam find")
+    "r"  '(org-roam-capture      :wk "Roam capture")
+    "rt" '(org-roam-node-find    :wk "Task notes")
+    "rp" '(org-roam-node-find    :wk "Project notes")
+    "rr" '(org-roam-node-find    :wk "Reference notes")
+
+    ;; Utilities
+    "q"  '(my/quick-add-to-inbox :wk "Quick add"))
+
+  ;; Neutralize Evil's `n r` (paste-pop) under leader prefix
+  (general-unbind :keymaps 'leader-minor-mode-keymap "n r"))
+#+end_src
+* System Integration
+** SSH Agent via GPG
+#+begin_src elisp
+(setenv "SSH_AUTH_SOCK"
+        (concat (or (getenv "XDG_RUNTIME_DIR")
+                    (format "/run/user/%d" (user-uid)))
+                "/gnupg/S.gpg-agent.ssh"))
+#+end_src
+
+** Final touch
+#+begin_src elisp
+(provide 'config)
+;;; config.el ends here
+#+end_src
